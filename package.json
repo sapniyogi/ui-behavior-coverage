@@ -1,0 +1,48 @@
+{
+  "name": "ui-behavior-coverage",
+  "version": "0.1.0-alpha.0",
+  "description": "Behavioral verification coverage for UI component tests.",
+  "license": "MIT",
+  "private": false,
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "bin": {
+    "ubc": "dist/src/cli/index.js",
+    "ui-behavior-coverage": "dist/src/cli/index.js"
+  },
+  "files": [
+    "dist/src",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test dist/tests/*.test.js",
+    "smoke": "npm run build && node dist/src/cli/index.js analyze --component tests/fixtures/SaveButton.tsx --test tests/fixtures/SaveButton.weak.test.tsx"
+  },
+  "dependencies": {
+    "typescript": "^5.8.3"
+  },
+  "keywords": [
+    "testing",
+    "react",
+    "coverage",
+    "behavioral-testing",
+    "testing-library",
+    "vitest",
+    "jest"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sapniyogi/ui-behavior-coverage.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sapniyogi/ui-behavior-coverage/issues"
+  },
+  "homepage": "https://github.com/sapniyogi/ui-behavior-coverage#readme"
+}
