@@ -91,3 +91,89 @@ test('text report makes the verification gap explicit', () => {
   assert.match(output, /Verification Gap:\s+100 pp/);
   assert.match(output, /expect\(onSave\)\.not\.toHaveBeenCalled\(\)/);
 });
+
+test('aggregates evidence across tests and keeps the strongest verification status', () => {
+  const testSource = `
+    it('only renders the disabled behavior', () => {
+      const onSave = vi.fn();
+      render(<SaveButton disabled onSave={onSave} />);
+    });
+
+    it('verifies the disabled behavior', async () => {
+      const onSave = vi.fn();
+      render(<SaveButton disabled onSave={onSave} />);
+      await user.click(screen.getByRole('button'));
+      expect(onSave).not.toHaveBeenCalled();
+    });
+  `;
+
+  const report = analyzeReactSources({ componentSource, testSource });
+  assert.equal(report.results[0]?.status, 'verified');
+  assert.equal(report.results[0]?.testName, 'verifies the disabled behavior');
+});
+
+test('resolves a const object spread into component props', () => {
+  const testSource = `
+    it('verifies spread props', async () => {
+      const onSave = vi.fn();
+      const props = { disabled: true, onSave };
+
+      render(<SaveButton {...props} />);
+      await user.click(screen.getByRole('button'));
+      expect(onSave).toHaveBeenCalledTimes(0);
+    });
+  `;
+
+  const report = analyzeReactSources({ componentSource, testSource });
+  assert.equal(report.results[0]?.status, 'verified');
+  assert.equal(report.results[0]?.callbackVariable, 'onSave');
+});
+
+test('resolves callback aliases from a const object spread', () => {
+  const testSource = `
+    it('verifies aliased callback', async () => {
+      const handler = vi.fn();
+      const props = { disabled: true, onSave: handler };
+
+      render(<SaveButton {...props} />);
+      await user.click(screen.getByRole('button'));
+      expect(handler).not.toHaveBeenCalled();
+    });
+  `;
+
+  const report = analyzeReactSources({ componentSource, testSource });
+  assert.equal(report.results[0]?.status, 'verified');
+  assert.equal(report.results[0]?.callbackVariable, 'handler');
+});
+
+test('honors explicit JSX props that override an earlier object spread', () => {
+  const testSource = `
+    it('overrides disabled', async () => {
+      const onSave = vi.fn();
+      const props = { disabled: true, onSave };
+
+      render(<SaveButton {...props} disabled={false} />);
+      await user.click(screen.getByRole('button'));
+      expect(onSave).not.toHaveBeenCalled();
+    });
+  `;
+
+  const report = analyzeReactSources({ componentSource, testSource });
+  assert.equal(report.results[0]?.status, 'discovered');
+  assert.equal(report.scores.behaviorReach, 0);
+});
+
+test('does not infer through an unresolved spread that may override known props', () => {
+  const testSource = `
+    it('has an unresolved trailing spread', async () => {
+      const onSave = vi.fn();
+      render(<SaveButton disabled onSave={onSave} {...otherProps} />);
+      await user.click(screen.getByRole('button'));
+      expect(onSave).not.toHaveBeenCalled();
+    });
+  `;
+
+  const report = analyzeReactSources({ componentSource, testSource });
+  assert.equal(report.results[0]?.status, 'discovered');
+  assert.equal(report.scores.behaviorReach, 0);
+});

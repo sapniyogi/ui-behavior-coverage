@@ -1,5 +1,5 @@
 import ts from 'typescript';
-import type { BehaviorContract, BehaviorResult } from '../core/model';
+import type { BehaviorContract, BehaviorResult, BehaviorStatus } from '../core/model';
 
 interface RenderBinding {
   callbackVariable: string;
@@ -9,6 +9,17 @@ interface RenderBinding {
 interface TestCase {
   name: string;
   body: ts.Node;
+}
+
+type ResolvedValue =
+  | { kind: 'true' }
+  | { kind: 'false' }
+  | { kind: 'identifier'; text: string }
+  | { kind: 'unknown' };
+
+interface PropResolution {
+  condition: ResolvedValue | undefined;
+  callback: ResolvedValue | undefined;
 }
 
 function isTestCall(node: ts.CallExpression): boolean {
@@ -37,27 +48,122 @@ function collectTestCases(sourceFile: ts.SourceFile): TestCase[] {
   return cases;
 }
 
-function getJsxAttribute(
-  element: ts.JsxOpeningLikeElement,
-  name: string,
-): ts.JsxAttribute | undefined {
-  return element.attributes.properties.find(
-    (property): property is ts.JsxAttribute =>
-      ts.isJsxAttribute(property) && ts.isIdentifier(property.name) && property.name.text === name,
+function isConstVariableDeclaration(node: ts.VariableDeclaration): boolean {
+  return (
+    ts.isVariableDeclarationList(node.parent) &&
+    (node.parent.flags & ts.NodeFlags.Const) === ts.NodeFlags.Const
   );
 }
 
-function attributeIsTrue(attribute: ts.JsxAttribute | undefined): boolean {
-  if (!attribute) return false;
-  if (!attribute.initializer) return true;
-  if (!ts.isJsxExpression(attribute.initializer) || !attribute.initializer.expression) return false;
-  return attribute.initializer.expression.kind === ts.SyntaxKind.TrueKeyword;
+function collectConstObjectLiterals(root: ts.Node): Map<string, ts.ObjectLiteralExpression> {
+  const objects = new Map<string, ts.ObjectLiteralExpression>();
+
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      isConstVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer &&
+      ts.isObjectLiteralExpression(node.initializer)
+    ) {
+      objects.set(node.name.text, node.initializer);
+    }
+    ts.forEachChild(node, visit);
+  };
+
+  visit(root);
+  return objects;
 }
 
-function identifierAttribute(attribute: ts.JsxAttribute | undefined): string | undefined {
-  if (!attribute?.initializer || !ts.isJsxExpression(attribute.initializer)) return undefined;
-  const expression = attribute.initializer.expression;
-  return expression && ts.isIdentifier(expression) ? expression.text : undefined;
+function expressionValue(expression: ts.Expression | undefined): ResolvedValue {
+  if (!expression) return { kind: 'unknown' };
+  if (expression.kind === ts.SyntaxKind.TrueKeyword) return { kind: 'true' };
+  if (expression.kind === ts.SyntaxKind.FalseKeyword) return { kind: 'false' };
+  if (ts.isIdentifier(expression)) return { kind: 'identifier', text: expression.text };
+  return { kind: 'unknown' };
+}
+
+function jsxAttributeValue(attribute: ts.JsxAttribute): ResolvedValue {
+  if (!attribute.initializer) return { kind: 'true' };
+  if (!ts.isJsxExpression(attribute.initializer)) return { kind: 'unknown' };
+  return expressionValue(attribute.initializer.expression);
+}
+
+function propertyNameText(name: ts.PropertyName): string | undefined {
+  if (ts.isIdentifier(name) || ts.isStringLiteralLike(name) || ts.isNumericLiteral(name)) {
+    return name.text;
+  }
+  return undefined;
+}
+
+function objectPropertyValue(
+  object: ts.ObjectLiteralExpression,
+  propertyName: string,
+): ResolvedValue | undefined {
+  let value: ResolvedValue | undefined;
+
+  for (const property of object.properties) {
+    if (ts.isSpreadAssignment(property)) {
+      // Nested object spreads are deliberately not resolved yet. If a later spread
+      // could override a target property, mark that property's value unknown.
+      value = { kind: 'unknown' };
+      continue;
+    }
+
+    if (ts.isPropertyAssignment(property) && propertyNameText(property.name) === propertyName) {
+      value = expressionValue(property.initializer);
+      continue;
+    }
+
+    if (ts.isShorthandPropertyAssignment(property) && property.name.text === propertyName) {
+      value = { kind: 'identifier', text: property.name.text };
+    }
+  }
+
+  return value;
+}
+
+function resolveComponentProps(
+  element: ts.JsxOpeningLikeElement,
+  behavior: BehaviorContract,
+  objects: Map<string, ts.ObjectLiteralExpression>,
+): PropResolution {
+  let condition: ResolvedValue | undefined;
+  let callback: ResolvedValue | undefined;
+
+  for (const property of element.attributes.properties) {
+    if (ts.isJsxSpreadAttribute(property)) {
+      if (!ts.isIdentifier(property.expression)) {
+        condition = { kind: 'unknown' };
+        callback = { kind: 'unknown' };
+        continue;
+      }
+
+      const object = objects.get(property.expression.text);
+      if (!object) {
+        // An unresolved spread may overwrite either property, so remain conservative.
+        condition = { kind: 'unknown' };
+        callback = { kind: 'unknown' };
+        continue;
+      }
+
+      const spreadCondition = objectPropertyValue(object, behavior.condition.prop);
+      const spreadCallback = objectPropertyValue(object, behavior.expectation.callbackProp);
+      if (spreadCondition) condition = spreadCondition;
+      if (spreadCallback) callback = spreadCallback;
+      continue;
+    }
+
+    if (!ts.isIdentifier(property.name)) continue;
+
+    if (property.name.text === behavior.condition.prop) {
+      condition = jsxAttributeValue(property);
+    } else if (property.name.text === behavior.expectation.callbackProp) {
+      callback = jsxAttributeValue(property);
+    }
+  }
+
+  return { condition, callback };
 }
 
 function matchingComponentElement(
@@ -83,6 +189,7 @@ function matchingComponentElement(
 
 function findRenderBinding(testBody: ts.Node, behavior: BehaviorContract): RenderBinding | undefined {
   let binding: RenderBinding | undefined;
+  const objects = collectConstObjectLiterals(testBody);
 
   const visit = (node: ts.Node): void => {
     if (binding) return;
@@ -95,13 +202,11 @@ function findRenderBinding(testBody: ts.Node, behavior: BehaviorContract): Rende
     ) {
       const component = matchingComponentElement(node.arguments[0], behavior.componentName);
       if (component) {
-        const condition = getJsxAttribute(component, behavior.condition.prop);
-        const callback = getJsxAttribute(component, behavior.expectation.callbackProp);
-        const callbackVariable = identifierAttribute(callback);
+        const props = resolveComponentProps(component, behavior, objects);
 
-        if (attributeIsTrue(condition) && callbackVariable) {
+        if (props.condition?.kind === 'true' && props.callback?.kind === 'identifier') {
           binding = {
-            callbackVariable,
+            callbackVariable: props.callback.text,
             renderPosition: node.getStart(),
           };
           return;
@@ -184,55 +289,76 @@ function verificationPositions(testBody: ts.Node, callbackVariable: string): num
   return positions;
 }
 
-function resultForBehavior(testCases: TestCase[], behavior: BehaviorContract): BehaviorResult {
-  for (const testCase of testCases) {
-    const binding = findRenderBinding(testCase.body, behavior);
-    if (!binding) continue;
+function resultForTestCase(testCase: TestCase, behavior: BehaviorContract): BehaviorResult | undefined {
+  const binding = findRenderBinding(testCase.body, behavior);
+  if (!binding) return undefined;
 
-    const interactions = interactionPositions(testCase.body, behavior.event.eventName)
-      .filter((position) => position > binding.renderPosition)
-      .sort((a, b) => a - b);
+  const interactions = interactionPositions(testCase.body, behavior.event.eventName)
+    .filter((position) => position > binding.renderPosition)
+    .sort((a, b) => a - b);
 
-    if (interactions.length === 0) {
-      return {
-        behavior,
-        status: 'discovered',
-        testName: testCase.name,
-        callbackVariable: binding.callbackVariable,
-        reason: `The test renders ${behavior.condition.prop}=true but does not exercise the ${behavior.event.eventName} interaction.`,
-      };
-    }
-
-    const firstInteraction = interactions[0]!;
-    const verifications = verificationPositions(testCase.body, binding.callbackVariable).filter(
-      (position) => position > firstInteraction,
-    );
-
-    if (verifications.length > 0) {
-      return {
-        behavior,
-        status: 'verified',
-        testName: testCase.name,
-        callbackVariable: binding.callbackVariable,
-        reason: `The behavior is exercised and the callback suppression is explicitly asserted after the interaction.`,
-      };
-    }
-
+  if (interactions.length === 0) {
     return {
       behavior,
-      status: 'exercised',
+      status: 'discovered',
       testName: testCase.name,
       callbackVariable: binding.callbackVariable,
-      reason: `The test renders ${behavior.condition.prop}=true and exercises ${behavior.event.eventName}, but never verifies that ${binding.callbackVariable} was suppressed.`,
-      suggestedAssertion: `expect(${binding.callbackVariable}).not.toHaveBeenCalled();`,
+      reason: `The test renders ${behavior.condition.prop}=true but does not exercise the ${behavior.event.eventName} interaction.`,
+    };
+  }
+
+  const firstInteraction = interactions[0]!;
+  const verifications = verificationPositions(testCase.body, binding.callbackVariable).filter(
+    (position) => position > firstInteraction,
+  );
+
+  if (verifications.length > 0) {
+    return {
+      behavior,
+      status: 'verified',
+      testName: testCase.name,
+      callbackVariable: binding.callbackVariable,
+      reason: 'The behavior is exercised and the callback suppression is explicitly asserted after the interaction.',
     };
   }
 
   return {
     behavior,
-    status: 'discovered',
-    reason: `No test renders ${behavior.componentName} with ${behavior.condition.prop}=true and a directly bound ${behavior.expectation.callbackProp} callback.`,
+    status: 'exercised',
+    testName: testCase.name,
+    callbackVariable: binding.callbackVariable,
+    reason: `The test renders ${behavior.condition.prop}=true and exercises ${behavior.event.eventName}, but never verifies that ${binding.callbackVariable} was suppressed.`,
+    suggestedAssertion: `expect(${binding.callbackVariable}).not.toHaveBeenCalled();`,
   };
+}
+
+const statusRank: Record<BehaviorStatus, number> = {
+  discovered: 0,
+  exercised: 1,
+  verified: 2,
+};
+
+function resultForBehavior(testCases: TestCase[], behavior: BehaviorContract): BehaviorResult {
+  let strongest: BehaviorResult | undefined;
+
+  for (const testCase of testCases) {
+    const candidate = resultForTestCase(testCase, behavior);
+    if (!candidate) continue;
+
+    if (!strongest || statusRank[candidate.status] > statusRank[strongest.status]) {
+      strongest = candidate;
+    }
+
+    if (strongest.status === 'verified') break;
+  }
+
+  return (
+    strongest ?? {
+      behavior,
+      status: 'discovered',
+      reason: `No test establishes ${behavior.componentName} with ${behavior.condition.prop}=true and a resolvable ${behavior.expectation.callbackProp} callback.`,
+    }
+  );
 }
 
 export function analyzeTestsAgainstBehaviors(

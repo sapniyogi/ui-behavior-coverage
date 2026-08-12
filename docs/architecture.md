@@ -57,13 +57,22 @@ The analyzer intentionally does not infer this semantic contract from custom `<B
 
 ## Current static-analysis limits
 
-The MVP intentionally does not yet perform full data-flow or alias analysis. It supports direct bindings such as:
+The analyzer intentionally does not perform full data-flow or alias analysis. It supports direct bindings such as:
 
 ```tsx
 <SaveButton disabled onSave={onSave} />
 ```
 
-and direct negative call assertions such as:
+and simple same-test `const` object spreads such as:
+
+```tsx
+const props = { disabled: true, onSave };
+render(<SaveButton {...props} />);
+```
+
+Object-spread support is deliberately conservative: unresolved or nested spreads are treated as unknown when they may override a relevant prop, and explicit JSX attributes are applied in source order.
+
+It also supports direct negative call assertions such as:
 
 ```tsx
 expect(onSave).not.toHaveBeenCalled();
