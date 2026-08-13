@@ -1,16 +1,14 @@
 import ts from 'typescript';
-import type { BehaviorContract, BehaviorKind } from '../core/model';
+import type {
+  RenderStateBehaviorContract,
+  RenderStateBehaviorKind,
+} from '../core/model';
 import { getAttribute, jsxTagName, lineOf } from '../providers/shared';
 
-type SupportedMuiComponent = 'Button' | 'Checkbox' | 'Switch' | 'Radio';
+type MuiStateComponent = 'Button' | 'Checkbox' | 'Switch' | 'Radio';
 type FunctionNode = ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction;
 
-const supportedMuiComponents = new Set<SupportedMuiComponent>([
-  'Button',
-  'Checkbox',
-  'Switch',
-  'Radio',
-]);
+const supported = new Set<MuiStateComponent>(['Button', 'Checkbox', 'Switch', 'Radio']);
 
 interface PropsObjectBinding {
   name: string;
@@ -20,7 +18,7 @@ interface PropsObjectBinding {
 interface ComponentContext {
   name: string;
   fn: FunctionNode;
-  localToPublicProp: Map<string, string>;
+  localToPublic: Map<string, string>;
   propsObjects: PropsObjectBinding[];
 }
 
@@ -29,22 +27,14 @@ interface BooleanBinding {
   inverted: boolean;
 }
 
-interface TruthyDependency {
-  prop: string;
-  when: boolean;
+function muiComponentFromModule(moduleName: string): MuiStateComponent | undefined {
+  if (!moduleName.startsWith('@mui/material/')) return undefined;
+  const name = moduleName.slice('@mui/material/'.length) as MuiStateComponent;
+  return supported.has(name) ? name : undefined;
 }
 
-function supportedComponentFromModule(moduleName: string): SupportedMuiComponent | undefined {
-  const prefix = '@mui/material/';
-  if (!moduleName.startsWith(prefix)) return undefined;
-  const name = moduleName.slice(prefix.length);
-  return supportedMuiComponents.has(name as SupportedMuiComponent)
-    ? (name as SupportedMuiComponent)
-    : undefined;
-}
-
-function collectMuiImports(sourceFile: ts.SourceFile): Map<string, SupportedMuiComponent> {
-  const bindings = new Map<string, SupportedMuiComponent>();
+function collectMuiImports(sourceFile: ts.SourceFile): Map<string, MuiStateComponent> {
+  const imports = new Map<string, MuiStateComponent>();
 
   for (const statement of sourceFile.statements) {
     if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
@@ -52,8 +42,8 @@ function collectMuiImports(sourceFile: ts.SourceFile): Map<string, SupportedMuiC
     if (!clause || clause.isTypeOnly) continue;
     const moduleName = statement.moduleSpecifier.text;
 
-    const defaultComponent = supportedComponentFromModule(moduleName);
-    if (defaultComponent && clause.name) bindings.set(clause.name.text, defaultComponent);
+    const defaultComponent = muiComponentFromModule(moduleName);
+    if (defaultComponent && clause.name) imports.set(clause.name.text, defaultComponent);
 
     if (moduleName !== '@mui/material' || !clause.namedBindings || !ts.isNamedImports(clause.namedBindings)) {
       continue;
@@ -61,17 +51,15 @@ function collectMuiImports(sourceFile: ts.SourceFile): Map<string, SupportedMuiC
 
     for (const element of clause.namedBindings.elements) {
       if (element.isTypeOnly) continue;
-      const importedName = element.propertyName?.text ?? element.name.text;
-      if (supportedMuiComponents.has(importedName as SupportedMuiComponent)) {
-        bindings.set(element.name.text, importedName as SupportedMuiComponent);
-      }
+      const importedName = (element.propertyName?.text ?? element.name.text) as MuiStateComponent;
+      if (supported.has(importedName)) imports.set(element.name.text, importedName);
     }
   }
 
-  return bindings;
+  return imports;
 }
 
-function nestedFunctionFromInitializer(expression: ts.Expression | undefined): FunctionNode | undefined {
+function nestedFunction(expression: ts.Expression | undefined): FunctionNode | undefined {
   if (!expression) return undefined;
   if (ts.isArrowFunction(expression) || ts.isFunctionExpression(expression)) return expression;
   if (!ts.isCallExpression(expression)) return undefined;
@@ -79,79 +67,67 @@ function nestedFunctionFromInitializer(expression: ts.Expression | undefined): F
   for (const argument of expression.arguments) {
     if (ts.isArrowFunction(argument) || ts.isFunctionExpression(argument)) return argument;
   }
-
-  if (ts.isCallExpression(expression.expression)) return nestedFunctionFromInitializer(expression.expression);
-  return undefined;
+  return ts.isCallExpression(expression.expression) ? nestedFunction(expression.expression) : undefined;
 }
 
-function collectPublicBindings(fn: FunctionNode): {
-  localToPublicProp: Map<string, string>;
-  propsObjects: PropsObjectBinding[];
-} {
-  const localToPublicProp = new Map<string, string>();
+function publicBindings(fn: FunctionNode): Pick<ComponentContext, 'localToPublic' | 'propsObjects'> {
+  const localToPublic = new Map<string, string>();
   const propsObjects: PropsObjectBinding[] = [];
   const parameter = fn.parameters[0];
-  if (!parameter) return { localToPublicProp, propsObjects };
+  if (!parameter) return { localToPublic, propsObjects };
 
   if (ts.isIdentifier(parameter.name)) {
     propsObjects.push({ name: parameter.name.text, excluded: new Set() });
-    return { localToPublicProp, propsObjects };
+    return { localToPublic, propsObjects };
   }
 
-  if (!ts.isObjectBindingPattern(parameter.name)) return { localToPublicProp, propsObjects };
-
+  if (!ts.isObjectBindingPattern(parameter.name)) return { localToPublic, propsObjects };
   const excluded = new Set<string>();
+
   for (const element of parameter.name.elements) {
     if (element.dotDotDotToken && ts.isIdentifier(element.name)) {
       propsObjects.push({ name: element.name.text, excluded: new Set(excluded) });
       continue;
     }
 
-    const propertyName = element.propertyName;
-    const publicName = propertyName && (ts.isIdentifier(propertyName) || ts.isStringLiteralLike(propertyName))
-      ? propertyName.text
+    const publicName = element.propertyName &&
+      (ts.isIdentifier(element.propertyName) || ts.isStringLiteralLike(element.propertyName))
+      ? element.propertyName.text
       : ts.isIdentifier(element.name)
         ? element.name.text
         : undefined;
     if (!publicName) continue;
-
     excluded.add(publicName);
-    if (ts.isIdentifier(element.name)) localToPublicProp.set(element.name.text, publicName);
+    if (ts.isIdentifier(element.name)) localToPublic.set(element.name.text, publicName);
   }
 
-  return { localToPublicProp, propsObjects };
+  return { localToPublic, propsObjects };
 }
 
 function collectComponents(sourceFile: ts.SourceFile): ComponentContext[] {
   const contexts: ComponentContext[] = [];
-
   const visit = (node: ts.Node): void => {
     if (ts.isFunctionDeclaration(node) && node.name && /^[A-Z]/.test(node.name.text)) {
-      contexts.push({ name: node.name.text, fn: node, ...collectPublicBindings(node) });
+      contexts.push({ name: node.name.text, fn: node, ...publicBindings(node) });
     }
-
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && /^[A-Z]/.test(node.name.text)) {
-      const fn = nestedFunctionFromInitializer(node.initializer);
-      if (fn) contexts.push({ name: node.name.text, fn, ...collectPublicBindings(fn) });
+      const fn = nestedFunction(node.initializer);
+      if (fn) contexts.push({ name: node.name.text, fn, ...publicBindings(fn) });
     }
-
     ts.forEachChild(node, visit);
   };
-
   visit(sourceFile);
   return contexts;
 }
 
-function unwrapExpression(expression: ts.Expression): ts.Expression {
+function unwrap(expression: ts.Expression): ts.Expression {
   let current = expression;
   while (
     ts.isParenthesizedExpression(current) ||
     ts.isAsExpression(current) ||
     ts.isTypeAssertionExpression(current) ||
     ts.isNonNullExpression(current)
-  ) {
-    current = current.expression;
-  }
+  ) current = current.expression;
   return current;
 }
 
@@ -160,22 +136,18 @@ function propsObject(context: ComponentContext, name: string): PropsObjectBindin
 }
 
 function directPublicProp(expression: ts.Expression, context: ComponentContext): string | undefined {
-  const current = unwrapExpression(expression);
-  if (ts.isIdentifier(current)) return context.localToPublicProp.get(current.text);
-
+  const current = unwrap(expression);
+  if (ts.isIdentifier(current)) return context.localToPublic.get(current.text);
   if (
     ts.isPropertyAccessExpression(current) &&
     ts.isIdentifier(current.expression) &&
     propsObject(context, current.expression.text)
-  ) {
-    return current.name.text;
-  }
-
+  ) return current.name.text;
   return undefined;
 }
 
 function booleanBinding(expression: ts.Expression, context: ComponentContext): BooleanBinding | undefined {
-  const current = unwrapExpression(expression);
+  const current = unwrap(expression);
   const direct = directPublicProp(current, context);
   if (direct) return { prop: direct, inverted: false };
 
@@ -189,22 +161,23 @@ function booleanBinding(expression: ts.Expression, context: ComponentContext): B
     ts.isIdentifier(current.expression) &&
     current.expression.text === 'Boolean' &&
     current.arguments[0]
-  ) {
-    return booleanBinding(current.arguments[0], context);
-  }
+  ) return booleanBinding(current.arguments[0], context);
 
   return undefined;
 }
 
 function booleanLiteral(expression: ts.Expression): boolean | undefined {
-  const current = unwrapExpression(expression);
+  const current = unwrap(expression);
   if (current.kind === ts.SyntaxKind.TrueKeyword) return true;
   if (current.kind === ts.SyntaxKind.FalseKeyword) return false;
   return undefined;
 }
 
-function truthyDependencies(expression: ts.Expression, context: ComponentContext): TruthyDependency[] | undefined {
-  const current = unwrapExpression(expression);
+function truthyDependencies(
+  expression: ts.Expression,
+  context: ComponentContext,
+): Array<{ prop: string; when: boolean }> | undefined {
+  const current = unwrap(expression);
   const binding = booleanBinding(current, context);
   if (binding) return [{ prop: binding.prop, when: !binding.inverted }];
 
@@ -214,32 +187,23 @@ function truthyDependencies(expression: ts.Expression, context: ComponentContext
     return left && right ? [...left, ...right] : undefined;
   }
 
-  if (ts.isBinaryExpression(current)) {
-    const operator = current.operatorToken.kind;
-    const leftProp = directPublicProp(current.left, context);
-    const rightProp = directPublicProp(current.right, context);
-    const leftBoolean = booleanLiteral(current.left);
-    const rightBoolean = booleanLiteral(current.right);
+  if (!ts.isBinaryExpression(current)) return undefined;
+  const operator = current.operatorToken.kind;
+  const leftProp = directPublicProp(current.left, context);
+  const rightProp = directPublicProp(current.right, context);
+  const leftBoolean = booleanLiteral(current.left);
+  const rightBoolean = booleanLiteral(current.right);
 
-    if (leftProp && rightBoolean !== undefined) {
-      if (operator === ts.SyntaxKind.EqualsEqualsEqualsToken || operator === ts.SyntaxKind.EqualsEqualsToken) {
-        return [{ prop: leftProp, when: rightBoolean }];
-      }
-      if (operator === ts.SyntaxKind.ExclamationEqualsEqualsToken || operator === ts.SyntaxKind.ExclamationEqualsToken) {
-        return [{ prop: leftProp, when: !rightBoolean }];
-      }
-    }
+  const equality = operator === ts.SyntaxKind.EqualsEqualsEqualsToken || operator === ts.SyntaxKind.EqualsEqualsToken;
+  const inequality = operator === ts.SyntaxKind.ExclamationEqualsEqualsToken || operator === ts.SyntaxKind.ExclamationEqualsToken;
+  if (!equality && !inequality) return undefined;
 
-    if (rightProp && leftBoolean !== undefined) {
-      if (operator === ts.SyntaxKind.EqualsEqualsEqualsToken || operator === ts.SyntaxKind.EqualsEqualsToken) {
-        return [{ prop: rightProp, when: leftBoolean }];
-      }
-      if (operator === ts.SyntaxKind.ExclamationEqualsEqualsToken || operator === ts.SyntaxKind.ExclamationEqualsToken) {
-        return [{ prop: rightProp, when: !leftBoolean }];
-      }
-    }
+  if (leftProp && rightBoolean !== undefined) {
+    return [{ prop: leftProp, when: equality ? rightBoolean : !rightBoolean }];
   }
-
+  if (rightProp && leftBoolean !== undefined) {
+    return [{ prop: rightProp, when: equality ? leftBoolean : !leftBoolean }];
+  }
   return undefined;
 }
 
@@ -249,55 +213,32 @@ function attributeExpression(node: ts.JsxOpeningLikeElement, name: string): ts.E
   return attribute.initializer.expression;
 }
 
-function effectiveSpreadBinding(
-  node: ts.JsxOpeningLikeElement,
-  prop: string,
-  context: ComponentContext,
-): boolean {
-  let forwards = false;
-
+function forwardsProp(node: ts.JsxOpeningLikeElement, prop: string, context: ComponentContext): boolean {
+  let forwarded = false;
   for (const property of node.attributes.properties) {
     if (ts.isJsxAttribute(property) && ts.isIdentifier(property.name) && property.name.text === prop) {
-      forwards = false;
+      forwarded = false;
       continue;
     }
-
     if (!ts.isJsxSpreadAttribute(property)) continue;
     if (ts.isIdentifier(property.expression)) {
       const binding = propsObject(context, property.expression.text);
       if (binding && !binding.excluded.has(prop)) {
-        forwards = true;
+        forwarded = true;
         continue;
       }
     }
-    forwards = false;
+    forwarded = false;
   }
-
-  return forwards;
-}
-
-function evidence(sourceFile: ts.SourceFile, node: ts.Node) {
-  return {
-    fileName: sourceFile.fileName,
-    line: lineOf(sourceFile, node),
-    snippet: node.getText(sourceFile),
-  };
+  return forwarded;
 }
 
 function pushState(
-  behaviors: BehaviorContract[],
+  behaviors: RenderStateBehaviorContract[],
   sourceFile: ts.SourceFile,
   node: ts.JsxOpeningLikeElement,
   componentName: string,
-  kind: Extract<BehaviorKind,
-    | 'mui-button-disabled-render-state'
-    | 'mui-button-loading-render-state'
-    | 'mui-checkbox-disabled-render-state'
-    | 'mui-checkbox-checked-render-state'
-    | 'mui-switch-disabled-render-state'
-    | 'mui-switch-checked-render-state'
-    | 'mui-radio-disabled-render-state'
-    | 'mui-radio-checked-render-state'>,
+  kind: RenderStateBehaviorKind,
   conditionProp: string,
   conditionValue: boolean,
   state: 'disabled' | 'checked',
@@ -310,96 +251,53 @@ function pushState(
     kind,
     title: `${conditionProp}=${conditionValue} renders ${state}=${stateValue}`,
     condition: { prop: conditionProp, value: conditionValue },
-    event: { handlerProp: '', eventName: 'render' },
+    event: { eventName: 'render' },
     expectation: { type: 'element-boolean-state', state, value: stateValue },
-    evidence: evidence(sourceFile, node),
+    evidence: {
+      fileName: sourceFile.fileName,
+      line: lineOf(sourceFile, node),
+      snippet: node.getText(sourceFile),
+    },
   });
 }
 
-function disabledKind(component: SupportedMuiComponent): Extract<BehaviorKind,
-  | 'mui-button-disabled-render-state'
-  | 'mui-checkbox-disabled-render-state'
-  | 'mui-switch-disabled-render-state'
-  | 'mui-radio-disabled-render-state'> {
+function disabledKind(component: MuiStateComponent): RenderStateBehaviorKind {
   if (component === 'Button') return 'mui-button-disabled-render-state';
   if (component === 'Checkbox') return 'mui-checkbox-disabled-render-state';
   if (component === 'Switch') return 'mui-switch-disabled-render-state';
   return 'mui-radio-disabled-render-state';
 }
 
-function checkedKind(component: Exclude<SupportedMuiComponent, 'Button'>): Extract<BehaviorKind,
-  | 'mui-checkbox-checked-render-state'
-  | 'mui-switch-checked-render-state'
-  | 'mui-radio-checked-render-state'> {
+function checkedKind(component: Exclude<MuiStateComponent, 'Button'>): RenderStateBehaviorKind {
   if (component === 'Checkbox') return 'mui-checkbox-checked-render-state';
   if (component === 'Switch') return 'mui-switch-checked-render-state';
   return 'mui-radio-checked-render-state';
 }
 
 function inferUsage(
-  behaviors: BehaviorContract[],
+  behaviors: RenderStateBehaviorContract[],
   sourceFile: ts.SourceFile,
   node: ts.JsxOpeningLikeElement,
   context: ComponentContext,
-  component: SupportedMuiComponent,
+  component: MuiStateComponent,
 ): void {
-  const disabledExpression = attributeExpression(node, 'disabled');
-  if (disabledExpression) {
-    for (const dependency of truthyDependencies(disabledExpression, context) ?? []) {
-      pushState(
-        behaviors,
-        sourceFile,
-        node,
-        context.name,
-        disabledKind(component),
-        dependency.prop,
-        dependency.when,
-        'disabled',
-        true,
-      );
+  const disabled = attributeExpression(node, 'disabled');
+  if (disabled) {
+    for (const dependency of truthyDependencies(disabled, context) ?? []) {
+      pushState(behaviors, sourceFile, node, context.name, disabledKind(component), dependency.prop, dependency.when, 'disabled', true);
     }
-  } else if (effectiveSpreadBinding(node, 'disabled', context)) {
-    pushState(
-      behaviors,
-      sourceFile,
-      node,
-      context.name,
-      disabledKind(component),
-      'disabled',
-      true,
-      'disabled',
-      true,
-    );
+  } else if (forwardsProp(node, 'disabled', context)) {
+    pushState(behaviors, sourceFile, node, context.name, disabledKind(component), 'disabled', true, 'disabled', true);
   }
 
   if (component === 'Button') {
-    const loadingExpression = attributeExpression(node, 'loading');
-    if (loadingExpression) {
-      for (const dependency of truthyDependencies(loadingExpression, context) ?? []) {
-        pushState(
-          behaviors,
-          sourceFile,
-          node,
-          context.name,
-          'mui-button-loading-render-state',
-          dependency.prop,
-          dependency.when,
-          'disabled',
-          true,
-        );
+    const loading = attributeExpression(node, 'loading');
+    if (loading) {
+      for (const dependency of truthyDependencies(loading, context) ?? []) {
+        pushState(behaviors, sourceFile, node, context.name, 'mui-button-loading-render-state', dependency.prop, dependency.when, 'disabled', true);
       }
-    } else if (effectiveSpreadBinding(node, 'loading', context)) {
-      pushState(
-        behaviors,
-        sourceFile,
-        node,
-        context.name,
-        'mui-button-loading-render-state',
-        'loading',
-        true,
-        'disabled',
-        true,
-      );
+    } else if (forwardsProp(node, 'loading', context)) {
+      pushState(behaviors, sourceFile, node, context.name, 'mui-button-loading-render-state', 'loading', true, 'disabled', true);
     }
     return;
   }
@@ -407,13 +305,12 @@ function inferUsage(
   const checkedExpression = attributeExpression(node, 'checked');
   const checked = checkedExpression
     ? booleanBinding(checkedExpression, context)
-    : effectiveSpreadBinding(node, 'checked', context)
+    : forwardsProp(node, 'checked', context)
       ? { prop: 'checked', inverted: false }
       : undefined;
-
   if (!checked) return;
+
   for (const publicValue of [false, true] as const) {
-    const renderedValue = checked.inverted ? !publicValue : publicValue;
     pushState(
       behaviors,
       sourceFile,
@@ -423,32 +320,31 @@ function inferUsage(
       checked.prop,
       publicValue,
       'checked',
-      renderedValue,
+      checked.inverted ? !publicValue : publicValue,
     );
   }
 }
 
-export function extractMaterialUiRenderStateBehaviors(sourceFile: ts.SourceFile): BehaviorContract[] {
+export function extractMaterialUiRenderStateBehaviors(
+  sourceFile: ts.SourceFile,
+): RenderStateBehaviorContract[] {
   const muiImports = collectMuiImports(sourceFile);
   if (muiImports.size === 0) return [];
 
-  const components = collectComponents(sourceFile);
-  const componentFunctions = new Set(components.map((context) => context.fn));
-  const behaviors: BehaviorContract[] = [];
+  const contexts = collectComponents(sourceFile);
+  const functions = new Set(contexts.map((context) => context.fn));
+  const behaviors: RenderStateBehaviorContract[] = [];
 
-  for (const context of components) {
+  for (const context of contexts) {
     const visit = (node: ts.Node): void => {
-      if (node !== context.fn && componentFunctions.has(node as FunctionNode)) return;
-
+      if (node !== context.fn && functions.has(node as FunctionNode)) return;
       if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
         const tag = jsxTagName(node);
-        const muiComponent = tag ? muiImports.get(tag) : undefined;
-        if (muiComponent) inferUsage(behaviors, sourceFile, node, context, muiComponent);
+        const component = tag ? muiImports.get(tag) : undefined;
+        if (component) inferUsage(behaviors, sourceFile, node, context, component);
       }
-
       ts.forEachChild(node, visit);
     };
-
     if (context.fn.body) visit(context.fn.body);
   }
 
@@ -459,10 +355,8 @@ export function extractMaterialUiRenderStateBehaviors(sourceFile: ts.SourceFile)
       behavior.kind,
       behavior.condition.prop,
       String(behavior.condition.value),
-      behavior.expectation.type,
-      behavior.expectation.type === 'element-boolean-state'
-        ? `${behavior.expectation.state}:${behavior.expectation.value}`
-        : '',
+      behavior.expectation.state,
+      String(behavior.expectation.value),
     ].join('|');
     if (seen.has(key)) return false;
     seen.add(key);
