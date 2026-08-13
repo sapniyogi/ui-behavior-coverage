@@ -4,12 +4,18 @@ import type {
   BehaviorStatus,
   RenderStateBehaviorContract,
 } from '../core/model';
-import { findRenderEvidence, type RenderEvidence } from './semantic-test-environment';
+import {
+  collectLexicalTestEnvironment,
+  findRenderEvidence,
+  type RenderEvidence,
+  type TestEnvironment,
+} from './semantic-test-environment';
 import { findVerificationPosition } from './semantic-test-assertions';
 
 interface TestCase {
   name: string;
   body: ts.Node;
+  environment: TestEnvironment;
 }
 
 function collectTestCases(sourceFile: ts.SourceFile): TestCase[] {
@@ -26,6 +32,7 @@ function collectTestCases(sourceFile: ts.SourceFile): TestCase[] {
         result.push({
           name: name && ts.isStringLiteralLike(name) ? name.text : '<anonymous test>',
           body: callback.body,
+          environment: collectLexicalTestEnvironment(node),
         });
       }
     }
@@ -91,10 +98,15 @@ function resultForTest(
   testCase: TestCase,
   behavior: RenderStateBehaviorContract,
 ): BehaviorResult | undefined {
-  const rendered = findRenderEvidence(testCase.body, behavior);
+  const rendered = findRenderEvidence(testCase.body, behavior, testCase.environment);
   if (!rendered) return undefined;
 
-  const verifiedAt = findVerificationPosition(testCase.body, behavior, rendered);
+  const verifiedAt = findVerificationPosition(
+    testCase.body,
+    behavior,
+    rendered,
+    testCase.environment,
+  );
   if (verifiedAt !== undefined) {
     return {
       behavior,
