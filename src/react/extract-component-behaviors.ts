@@ -25,15 +25,11 @@ function expectationKey(expectation: BehaviorExpectation): string {
     ].join(':');
   }
 
-  if (expectation.type === 'callback-event-path') {
-    return [
-      expectation.type,
-      expectation.callbackProp,
-      expectation.path.join('.'),
-    ].join(':');
-  }
-
-  return `${expectation.type}:${expectation.state}:${expectation.value}`;
+  return [
+    expectation.type,
+    expectation.callbackProp,
+    expectation.path.join('.'),
+  ].join(':');
 }
 
 /**
