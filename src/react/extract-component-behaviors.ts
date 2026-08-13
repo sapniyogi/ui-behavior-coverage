@@ -1,5 +1,5 @@
 import ts from 'typescript';
-import type { BehaviorContract } from '../core/model';
+import type { BehaviorContract, BehaviorExpectation } from '../core/model';
 import { materialUiBehaviorProvider } from '../providers/material-ui';
 import { materialUiCompositionProvider } from '../providers/material-ui-composition';
 import { nativeHtmlBehaviorProvider } from '../providers/native-html';
@@ -10,6 +10,47 @@ export const defaultBehaviorProviders: readonly BehaviorProvider[] = [
   materialUiBehaviorProvider,
   materialUiCompositionProvider,
 ];
+
+function expectationKey(expectation: BehaviorExpectation): string {
+  if (expectation.type === 'callback-not-called') {
+    return `${expectation.type}:${expectation.callbackProp}`;
+  }
+
+  if (expectation.type === 'callback-event-boolean') {
+    return [
+      expectation.type,
+      expectation.callbackProp,
+      expectation.path.join('.'),
+      String(expectation.value),
+    ].join(':');
+  }
+
+  return [
+    expectation.type,
+    expectation.callbackProp,
+    expectation.path.join('.'),
+  ].join(':');
+}
+
+/**
+ * Provider IDs are intentionally implementation-specific. Multiple providers may
+ * discover the same public contract through different evidence paths, so merge
+ * by observable semantics instead. Provider order is precedence order: the
+ * established direct provider wins over the broader composition provider when
+ * both describe the same behavior.
+ */
+function semanticBehaviorKey(behavior: BehaviorContract): string {
+  return [
+    behavior.provider,
+    behavior.componentName,
+    behavior.kind,
+    behavior.condition.prop,
+    String(behavior.condition.value),
+    behavior.event.handlerProp,
+    behavior.event.eventName,
+    expectationKey(behavior.expectation),
+  ].join('|');
+}
 
 export function extractComponentBehaviors(
   sourceText: string,
@@ -24,12 +65,19 @@ export function extractComponentBehaviors(
     ts.ScriptKind.TSX,
   );
 
-  const behaviors = providers.flatMap((provider) => provider.extract(sourceFile));
-  const seen = new Set<string>();
+  const merged: BehaviorContract[] = [];
+  const seenIds = new Set<string>();
+  const seenSemantics = new Set<string>();
 
-  return behaviors.filter((behavior) => {
-    if (seen.has(behavior.id)) return false;
-    seen.add(behavior.id);
-    return true;
-  });
+  for (const provider of providers) {
+    for (const behavior of provider.extract(sourceFile)) {
+      const semanticKey = semanticBehaviorKey(behavior);
+      if (seenIds.has(behavior.id) || seenSemantics.has(semanticKey)) continue;
+      seenIds.add(behavior.id);
+      seenSemantics.add(semanticKey);
+      merged.push(behavior);
+    }
+  }
+
+  return merged;
 }
