@@ -11,6 +11,16 @@ export type BehaviorKind =
   | 'mui-text-field-value-change'
   | 'mui-select-native-value-change';
 
+export type RenderStateBehaviorKind =
+  | 'mui-button-disabled-render-state'
+  | 'mui-button-loading-render-state'
+  | 'mui-checkbox-disabled-render-state'
+  | 'mui-checkbox-checked-render-state'
+  | 'mui-switch-disabled-render-state'
+  | 'mui-switch-checked-render-state'
+  | 'mui-radio-disabled-render-state'
+  | 'mui-radio-checked-render-state';
+
 export type BehaviorProviderName = 'native-html' | 'material-ui';
 
 export type BehaviorStatus = 'discovered' | 'exercised' | 'verified';
@@ -58,8 +68,28 @@ export interface BehaviorContract {
   evidence: SourceEvidence;
 }
 
+export interface RenderStateBehaviorContract {
+  id: string;
+  componentName: string;
+  provider: 'material-ui';
+  kind: RenderStateBehaviorKind;
+  title: string;
+  condition: BehaviorCondition;
+  event: {
+    eventName: 'render';
+  };
+  expectation: {
+    type: 'element-boolean-state';
+    state: 'disabled' | 'checked';
+    value: boolean;
+  };
+  evidence: SourceEvidence;
+}
+
+export type AnyBehaviorContract = BehaviorContract | RenderStateBehaviorContract;
+
 export interface BehaviorResult {
-  behavior: BehaviorContract;
+  behavior: AnyBehaviorContract;
   status: BehaviorStatus;
   testName?: string;
   callbackVariable?: string;
@@ -83,12 +113,29 @@ export interface AnalysisReport {
   scores: CoverageScores;
 }
 
+export type DiscoverySkipReason =
+  | 'no-runtime-jsx'
+  | 'no-rendered-component-import'
+  | 'external-module'
+  | 'unresolved-module'
+  | 'unresolved-barrel-export';
+
+export interface ProjectDiscoveryTelemetry {
+  totalTestFiles: number;
+  testFilesWithRuntimeJsx: number;
+  testFilesWithTargets: number;
+  importsExamined: number;
+  importsResolved: number;
+  skipped: Record<DiscoverySkipReason, number>;
+}
+
 export interface ProjectAnalysisReport {
   rootDir: string;
   componentsAnalyzed: number;
   testFilesAnalyzed: number;
   reports: AnalysisReport[];
   scores: CoverageScores;
+  discovery?: ProjectDiscoveryTelemetry;
 }
 
 export type DesignObservationKind = 'mui-box-border-radius';

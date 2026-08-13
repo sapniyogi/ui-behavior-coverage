@@ -75,6 +75,21 @@ export function formatProjectTextReport(report: ProjectAnalysisReport): string {
   lines.push(`Components: ${report.componentsAnalyzed}`);
   lines.push(`Test files: ${report.testFilesAnalyzed}`);
 
+  if (report.discovery) {
+    lines.push('');
+    lines.push('Discovery');
+    lines.push('---------');
+    lines.push(`Test files found:         ${report.discovery.totalTestFiles}`);
+    lines.push(`With runtime JSX:         ${report.discovery.testFilesWithRuntimeJsx}`);
+    lines.push(`With resolved targets:    ${report.discovery.testFilesWithTargets}`);
+    lines.push(`Rendered imports checked: ${report.discovery.importsExamined}`);
+    lines.push(`Rendered imports resolved:${report.discovery.importsResolved}`);
+    lines.push('Skipped / unresolved signals:');
+    for (const [reason, count] of Object.entries(report.discovery.skipped)) {
+      if (count > 0) lines.push(`  ${reason}: ${count}`);
+    }
+  }
+
   if (report.reports.length === 0) {
     lines.push('');
     lines.push('No supported React/TSX or Material UI test targets were discovered.');

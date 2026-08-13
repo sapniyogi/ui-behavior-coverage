@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - agent/external-eval-5-repos
+      - agent/phase-6-production-readiness
   workflow_dispatch:
 
 permissions:
@@ -21,18 +22,23 @@ jobs:
           - slug: opencti
             repository: OpenCTI-Platform/opencti
             scope: opencti-platform/opencti-front
+            sha: 2dfbddd21c3316bfcd1b3d7e1a35358feb9e6223
           - slug: clash-verge-rev
             repository: clash-verge-rev/clash-verge-rev
             scope: src
+            sha: aadceba0642b8f58cf7c6e426ff29bf6846cbfe1
           - slug: react-admin
             repository: marmelab/react-admin
             scope: packages/ra-ui-materialui
+            sha: 051f511bb0afb5ea565c2d3728bf4dab0a6fa5e0
           - slug: mui-x-data-grid
             repository: mui/mui-x
             scope: packages/x-data-grid
+            sha: 17580d3dfe835b4d4b1290f50c4d95ed7b74de21
           - slug: toolpad-core
             repository: mui/toolpad
             scope: packages/toolpad-core
+            sha: b2a4a69f343e98e6f3f7ebeba47dbc609c542e37
 
     steps:
       - name: Checkout analyzer
@@ -49,22 +55,29 @@ jobs:
           npm ci
           npm run build
 
-      - name: Clone target repository scope
+      - name: Clone pinned target repository scope
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p external
-          git clone --depth 1 --filter=blob:none --sparse "https://github.com/${{ matrix.repository }}.git" "external/${{ matrix.slug }}"
-          cd "external/${{ matrix.slug }}"
+          TARGET="external/${{ matrix.slug }}"
+          mkdir -p "$TARGET"
+          cd "$TARGET"
+          git init
+          git remote add origin "https://github.com/${{ matrix.repository }}.git"
+          git sparse-checkout init --cone
           git sparse-checkout set "${{ matrix.scope }}"
-          git rev-parse HEAD > ../${{ matrix.slug }}-sha.txt
+          git fetch --depth 1 origin "${{ matrix.sha }}"
+          git checkout --detach FETCH_HEAD
+          ACTUAL_SHA=$(git rev-parse HEAD)
+          test "$ACTUAL_SHA" = "${{ matrix.sha }}"
+          printf '%s\n' "$ACTUAL_SHA" > "../${{ matrix.slug }}-sha.txt"
 
       - name: Inventory target scope
         shell: bash
         run: |
           set -euo pipefail
           ROOT="external/${{ matrix.slug }}/${{ matrix.scope }}"
-          TEST_FILES=$(find "$ROOT" -type f \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.ts' -o -name '*.spec.tsx' \) | wc -l | tr -d ' ')
+          TEST_FILES=$(find "$ROOT" -type f \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.test.js' -o -name '*.test.jsx' -o -name '*.spec.ts' -o -name '*.spec.tsx' -o -name '*.spec.js' -o -name '*.spec.jsx' \) | wc -l | tr -d ' ')
           TSX_FILES=$(find "$ROOT" -type f -name '*.tsx' | wc -l | tr -d ' ')
           MUI_FILES=$(grep -RIl --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' '@mui/material' "$ROOT" 2>/dev/null | wc -l | tr -d ' ')
           printf '{"testFiles":%s,"tsxFiles":%s,"muiImportFiles":%s}\n' "$TEST_FILES" "$TSX_FILES" "$MUI_FILES" > "external/${{ matrix.slug }}-inventory.json"
@@ -106,6 +119,7 @@ jobs:
             scope,
             upstreamSha,
             ...inventory,
+            discovery: analysis.discovery,
             scores: analysis.scores,
             componentsAnalyzed: analysis.componentsAnalyzed,
             testFilesAnalyzed: analysis.testFilesAnalyzed,
@@ -150,6 +164,7 @@ jobs:
             inventory: row.inventory,
             componentsAnalyzed: row.analysis.componentsAnalyzed,
             testFilesAnalyzed: row.analysis.testFilesAnalyzed,
+            discovery: row.analysis.discovery,
             scores: row.analysis.scores,
           }));
           console.log(JSON.stringify(combined, null, 2));
