@@ -14,14 +14,25 @@ declare module 'node:fs' {
     isDirectory(): boolean;
     isFile(): boolean;
   };
+  export function mkdtempSync(prefix: string): string;
+  export function mkdirSync(path: string, options?: { recursive?: boolean }): string | undefined;
+  export function rmSync(path: string, options?: { recursive?: boolean; force?: boolean }): void;
+  export function writeFileSync(path: string, data: string): void;
 }
 
 declare module 'node:path' {
+  export function basename(path: string): string;
   export function dirname(path: string): string;
   export function extname(path: string): string;
+  export function isAbsolute(path: string): boolean;
   export function join(...paths: string[]): string;
+  export function normalize(path: string): string;
   export function relative(from: string, to: string): string;
   export function resolve(...paths: string[]): string;
+}
+
+declare module 'node:os' {
+  export function tmpdir(): string;
 }
 
 declare module 'node:child_process' {
