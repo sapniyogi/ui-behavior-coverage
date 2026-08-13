@@ -14,21 +14,26 @@ Recognizes directly bound disabled semantics on native controls, for example:
 
 ### Material UI
 
-Recognizes imports from `@mui/material` plus direct component modules such as `@mui/material/Button` and `@mui/material/Checkbox`.
+Recognizes supported imports from `@mui/material` plus direct component modules such as `@mui/material/Button`, `@mui/material/Switch`, and `@mui/material/TextField`.
 
-Phase 4 contracts:
+Current behavior contracts:
 
 - `Button`: `disabled=true` suppresses activation.
 - `Button`: `loading=true` suppresses activation.
 - `Checkbox`: `disabled=true` suppresses change activation.
-- controlled `Checkbox`: a click from `checked=false` expects `event.target.checked=true`.
-- controlled `Checkbox`: a click from `checked=true` expects `event.target.checked=false`.
+- controlled `Checkbox`: clicks verify the expected `event.target.checked` transition in both directions.
+- `Switch`: `disabled=true` suppresses change activation.
+- controlled `Switch`: clicks verify the expected `event.target.checked` transition in both directions.
+- standalone `Radio`: `disabled=true` suppresses change activation.
+- controlled standalone `Radio`: clicking from `checked=false` expects `event.target.checked=true`; no true-to-false toggle contract is inferred.
+- controlled `TextField`: typing requires an oracle on `onChange` `event.target.value`.
+- controlled native-mode `Select`: `selectOptions` requires an oracle on `onChange` `event.target.value`.
 
-The provider accepts default imports, named imports, and named imports aliased locally. A similarly named custom `<Button>` or `<Checkbox>` is never treated as MUI unless its import source identifies it as MUI.
+The provider accepts default imports, named imports, and named imports aliased locally. A similarly named custom component is never treated as MUI unless its runtime import source identifies it as MUI.
 
 ## Verification strength
 
-For Checkbox state transitions, `expect(onChange).toHaveBeenCalled()` is intentionally insufficient. The current deterministic strong oracle is an argument assertion such as:
+For boolean state transitions, `expect(onChange).toHaveBeenCalled()` is intentionally insufficient. A strong deterministic oracle is an argument assertion such as:
 
 ```tsx
 expect(onChange).toHaveBeenCalledWith(
@@ -38,24 +43,38 @@ expect(onChange).toHaveBeenCalledWith(
 );
 ```
 
-The matcher also accepts the equivalent nested shape through `toHaveBeenLastCalledWith`.
+For controlled text/value components, callback invocation alone is also insufficient. The current value oracle requires the documented event path to be asserted:
+
+```tsx
+expect(onChange).toHaveBeenLastCalledWith(
+  expect.objectContaining({
+    target: expect.objectContaining({ value: 'Ada' }),
+  }),
+);
+```
+
+The Phase 5 value matcher verifies that `target.value` is explicitly asserted. It does not yet prove that the asserted literal is the mathematically/semantically correct result of the preceding typing or selection sequence; deriving exact value flow is future work.
+
+## Select boundary
+
+Phase 5 intentionally supports `Select` only when `native` is statically true. This maps cleanly to Testing Library `selectOptions` semantics. Non-native Material UI Select uses a popup/menu interaction model and is deliberately left unsupported rather than treating it like a native `<select>` and risking false positives.
 
 ## Direct MUI tests
 
-`ubc scan` can analyze supported MUI components rendered directly in tests, without requiring a local wrapper component:
+`ubc scan` can analyze supported MUI components rendered directly in tests, without requiring a local wrapper component. Direct inference now includes Button, Checkbox, Switch, Radio, TextField, and native-mode Select when the required state/callback props are visible in the render expression.
 
-```tsx
-import { Button } from '@mui/material';
+The scanner does not traverse package source code and does not require `@mui/material` as a dependency of `ui-behavior-coverage` itself.
 
-render(<Button disabled onClick={onClick}>Save</Button>);
-await user.click(screen.getByRole('button'));
-expect(onClick).not.toHaveBeenCalled();
-```
+## Realistic fixture evaluation
 
-Direct-test inference is limited to concrete boolean states that are visible in the render expression; the scanner does not attempt package-source traversal.
+`tests/fixtures/mui-realistic/PreferencesForm.tsx` mixes Box, Switch, Radio, TextField, and native Select in one application-style form. Its project test intentionally verifies only a subset of inferred behaviors so the project scan can demonstrate a real verification gap instead of a synthetic 100% result.
+
+## Design guidance is separate
+
+Material UI `Box` is recognized by the design-observation layer for selected `sx` properties rather than by behavioral coverage. Phase 5 starts with `sx.borderRadius`. See [`design-guidance.md`](design-guidance.md).
 
 ## Custom providers
 
 `extractComponentBehaviors()` accepts an optional provider list. The public `BehaviorProvider` interface is designed so later adapters for Ant Design, Radix, Chakra, or an internal enterprise design system can be added without changing the core scoring model.
 
-Provider implementations should remain deterministic, identify their framework through runtime imports, cite/document the public semantics they encode, and include false-positive tests for similarly named non-framework components.
+Provider implementations should remain deterministic, identify their framework through runtime imports, encode documented public semantics, and include false-positive tests for similarly named non-framework components.

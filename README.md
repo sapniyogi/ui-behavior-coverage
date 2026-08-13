@@ -1,6 +1,6 @@
 # ui-behavior-coverage
 
-Behavioral verification coverage for UI component tests.
+Behavioral verification coverage for UI component tests, with an emerging design-system conformance layer.
 
 Traditional code coverage answers **"did this code execute?"** This project asks a different question:
 
@@ -8,41 +8,9 @@ Traditional code coverage answers **"did this code execute?"** This project asks
 
 ## Status
 
-Early research-driven MVP (`0.1.0-alpha`). The implementation is intentionally deterministic and conservative: supported behavioral contracts are expanded only when they can be inferred with explainable evidence and guarded against false positives.
+Early research-driven MVP (`0.1.0-alpha`). The implementation is deterministic and conservative: behavioral contracts are expanded only when they can be inferred with explainable evidence and guarded against false positives.
 
-## Example
-
-Component:
-
-```tsx
-export function SaveButton({ disabled, onSave }) {
-  return (
-    <button disabled={disabled} onClick={onSave}>
-      Save
-    </button>
-  );
-}
-```
-
-Weak test:
-
-```tsx
-it('handles a disabled button', async () => {
-  const onSave = vi.fn();
-  render(<SaveButton disabled onSave={onSave} />);
-  await user.click(screen.getByRole('button'));
-});
-```
-
-The behavior is reached, but the expected outcome is never asserted.
-
-`ui-behavior-coverage` reports it as **EXERCISED**, not **VERIFIED**, and suggests:
-
-```tsx
-expect(onSave).not.toHaveBeenCalled();
-```
-
-## Metrics
+## Core metrics
 
 - **Behavior Reach** — proportion of discovered behaviors exercised by tests.
 - **Behavior Verification** — proportion explicitly verified by assertions.
@@ -63,50 +31,32 @@ After publication, the intended command is:
 
 ```bash
 npx ui-behavior-coverage analyze --component Component.tsx --test Component.test.tsx
-```
-
-JSON output:
-
-```bash
-ubc analyze --component Component.tsx --test Component.test.tsx --json
-```
-
-Project scan:
-
-```bash
 ubc scan .
 ubc scan packages/ui --json
 ```
 
-`scan` conservatively discovers tests that directly render relatively imported TSX components, groups all matching tests for a component, and also recognizes supported direct Material UI package imports. It reports project-level Behavior Reach, Behavior Verification, and Verification Gap.
+`scan` conservatively discovers tests that directly render relatively imported TSX components, groups matching tests for a component, and recognizes supported direct Material UI package imports.
 
-## Material UI support
+## Material UI behavior support
 
-Phase 4 adds a framework-provider layer with first-class static support for selected Material UI contracts. `ui-behavior-coverage` does **not** add `@mui/material` as a runtime dependency; it recognizes supported MUI components from source imports.
+The Material UI provider recognizes supported components statically from imports. `ui-behavior-coverage` does **not** depend on `@mui/material` at runtime.
 
-Supported MUI contracts in this phase:
+Current contracts:
 
-- `Button`: `disabled=true` suppresses `onClick` activation.
-- `Button`: `loading=true` suppresses `onClick` activation.
-- `Checkbox`: `disabled=true` suppresses change activation.
-- controlled `Checkbox`: clicking from `checked=false` expects `event.target.checked=true`.
-- controlled `Checkbox`: clicking from `checked=true` expects `event.target.checked=false`.
+- `Button`: disabled and loading activation suppression.
+- `Checkbox`: disabled suppression and controlled checked-state transitions.
+- `Switch`: disabled suppression and controlled checked-state transitions.
+- standalone `Radio`: disabled suppression and unchecked-to-checked selection.
+- controlled `TextField`: typing must explicitly verify `onChange` `event.target.value`.
+- controlled native-mode `Select`: `selectOptions` must explicitly verify `onChange` `event.target.value`.
 
-Both package-level and direct component imports are recognized, including local aliases:
-
-```tsx
-import { Button, Checkbox } from '@mui/material';
-import MuiButton from '@mui/material/Button';
-import MuiCheckbox from '@mui/material/Checkbox';
-```
-
-For controlled Checkbox behavior, a weak assertion such as:
+For state/value contracts, callback presence alone is not enough:
 
 ```tsx
-expect(onChange).toHaveBeenCalled();
+expect(onChange).toHaveBeenCalled(); // still EXERCISED
 ```
 
-is still **EXERCISED**, because it does not verify the correct next state. A stronger supported oracle is:
+A stronger oracle verifies the documented event field:
 
 ```tsx
 expect(onChange).toHaveBeenCalledWith(
@@ -116,7 +66,52 @@ expect(onChange).toHaveBeenCalledWith(
 );
 ```
 
-See [`docs/providers.md`](docs/providers.md) for the provider model and [`docs/architecture.md`](docs/architecture.md) for deliberate limitations.
+or:
+
+```tsx
+expect(onChange).toHaveBeenLastCalledWith(
+  expect.objectContaining({
+    target: expect.objectContaining({ value: 'Ada' }),
+  }),
+);
+```
+
+Non-native Material UI Select is deliberately not assigned native `selectOptions` semantics yet; its popup/menu interaction model will get a separate rule.
+
+See [`docs/providers.md`](docs/providers.md) for provider details.
+
+## Realistic MUI evaluation
+
+Phase 5 includes an application-style `PreferencesForm` fixture combining `Box`, `Switch`, `Radio`, `TextField`, and native `Select`. The accompanying test suite intentionally verifies only part of the inferred behavior space so a project scan exposes remaining coverage rather than producing a synthetic perfect score.
+
+## Box and subtle design guidance
+
+Visual/design-system policy is intentionally separate from behavioral test coverage.
+
+Phase 5 starts a Material UI design-observation API with `Box` `sx.borderRadius`:
+
+```tsx
+<Box sx={{ borderRadius: 2 }} />
+```
+
+For MUI System, numeric border-radius values are theme multipliers. The extractor records the multiplier and, for convenience, the equivalent value under MUI's default 4px shape radius. Because applications can override the theme, that default-pixel value is informational only.
+
+```ts
+import {
+  evaluateBoxBorderRadiusGuidance,
+  extractMaterialUiDesignObservations,
+} from 'ui-behavior-coverage';
+
+const observations = extractMaterialUiDesignObservations(source);
+const results = evaluateBoxBorderRadiusGuidance(observations, {
+  allowedThemeMultipliers: [1, 2],
+  allowedCssValues: ['50%'],
+});
+```
+
+This design layer can later grow to spacing, colors, typography, shadows, responsive rules, and component variants without contaminating Behavior Reach or Behavior Verification.
+
+See [`docs/design-guidance.md`](docs/design-guidance.md).
 
 ## Native HTML contract
 
@@ -126,13 +121,7 @@ The initial deterministic rule recognizes directly-bound native disabled semanti
 <button disabled={disabled} onClick={onSave}>
 ```
 
-and test bindings of the form:
-
-```tsx
-<SaveButton disabled onSave={onSave} />
-```
-
-Suppression verification recognizes:
+and verifies suppression with assertions such as:
 
 ```tsx
 expect(onSave).not.toHaveBeenCalled();
@@ -141,11 +130,11 @@ expect(onSave).toHaveBeenCalledTimes(0);
 
 ## Project discovery boundaries
 
-Local component discovery currently pairs a test with component source only when a runtime relative import resolves to TSX and the imported identifier is rendered directly. Type-only imports, unresolved files, namespace JSX, JavaScript/JSX files, framework-specific path aliases, and unsupported package imports remain outside the current discovery boundary. Supported Material UI package imports are an explicit exception handled by the MUI provider.
+Local component discovery pairs a test with component source only when a runtime relative import resolves to TSX and the imported identifier is rendered directly. Type-only imports, unresolved files, namespace JSX, JavaScript/JSX files, framework-specific path aliases, and unsupported package imports remain outside the current boundary. Supported Material UI package imports are an explicit provider-backed exception.
 
 ## Research context and independence
 
-This project is motivated by recent research on behavioral test adequacy, metamorphic relations, UI-component testing, and weak test oracles. It is an independent implementation with its own terminology and architecture. Project contributors should not copy paper prose, figures, prompts, datasets, supplemental artifacts, or source code unless a separate license has been verified to permit that reuse.
+This project is motivated by research on behavioral test adequacy, metamorphic relations, UI-component testing, and weak test oracles. It is an independent implementation with its own terminology and architecture. Contributors should not copy paper prose, figures, prompts, datasets, supplemental artifacts, or source code unless a separate license has been verified to permit reuse.
 
 A key research inspiration is:
 
@@ -155,13 +144,15 @@ The project is not affiliated with or endorsed by the paper's authors.
 
 ## Roadmap
 
-1. Prove the exercised-vs-verified model on precise native behaviors.
+1. Prove exercised-vs-verified measurement on precise native behavior.
 2. Add richer assertion/data-flow matching.
-3. Add project discovery, reproducible packaging, and CI quality gates.
-4. Add provider-based Material UI support for Button and Checkbox.
-5. Expand framework contracts (Switch, Radio, TextField, Select) and evaluate on real open-source component libraries.
-6. Add additional providers such as Ant Design, Radix, Chakra, or internal enterprise design systems.
-7. Only then consider optional semantic/LLM-assisted contract inference.
+3. Add project discovery, packaging, and CI quality gates.
+4. Add provider-based Material UI Button/Checkbox support.
+5. Expand to Switch, Radio, TextField, native Select, realistic MUI fixtures, and initial Box design guidance.
+6. Add non-native Select semantics and broaden design-token analysis.
+7. Evaluate against larger real-world open-source MUI suites.
+8. Add additional providers such as Ant Design, Radix, Chakra, or internal enterprise design systems.
+9. Only then consider optional semantic/LLM-assisted contract inference.
 
 ## License
 
