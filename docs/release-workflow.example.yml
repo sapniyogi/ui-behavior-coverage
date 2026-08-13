@@ -1,0 +1,27 @@
+# Reference only. Review and copy to .github/workflows/publish.yml after configuring
+# npm Trusted Publishing for the exact workflow filename.
+name: Publish package
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+      - run: npm ci
+      - run: node scripts/verify-release-tag.mjs
+      - run: npm run release:check
+      - run: npm publish --access public

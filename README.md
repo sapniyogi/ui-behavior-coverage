@@ -1,102 +1,237 @@
 # ui-behavior-coverage
 
-Behavioral verification coverage for UI component tests.
+Experimental behavioral verification coverage for React component tests, with first-class Material UI semantics.
 
-Traditional code coverage answers **"did this code execute?"** This project asks a different question:
+Traditional code coverage asks **“did this code execute?”** `ui-behavior-coverage` asks a different question:
 
-> **Did the test explicitly verify the behavior it exercised?**
+> **Did the test explicitly verify the UI behavior it exercised?**
 
-## Status
+> **Alpha status:** `0.1.0-alpha.0` is intentionally conservative and incomplete. Unsupported patterns are skipped rather than guessed. Treat findings as test-quality evidence to review, not as a replacement for test execution or browser automation.
 
-Early research-driven MVP (`0.1.0-alpha`). The initial implementation intentionally supports a narrow React/TSX behavior so the core measurement can be validated before broadening inference.
-
-## Example
-
-Component:
-
-```tsx
-export function SaveButton({ disabled, onSave }) {
-  return (
-    <button disabled={disabled} onClick={onSave}>
-      Save
-    </button>
-  );
-}
-```
-
-Weak test:
-
-```tsx
-it('handles a disabled button', async () => {
-  const onSave = vi.fn();
-  render(<SaveButton disabled onSave={onSave} />);
-  await user.click(screen.getByRole('button'));
-});
-```
-
-The behavior is reached, but the expected outcome is never asserted.
-
-`ui-behavior-coverage` reports it as **EXERCISED**, not **VERIFIED**, and suggests:
-
-```tsx
-expect(onSave).not.toHaveBeenCalled();
-```
-
-## Metrics
-
-- **Behavior Reach** — proportion of discovered behaviors exercised by tests.
-- **Behavior Verification** — proportion explicitly verified by assertions.
-- **Verification Gap** — reach minus verification; a signal that tests touch behavior without proving the result.
-
-## CLI
+## Install and scan
 
 ```bash
-npm install
-npm run build
-
-node dist/src/cli/index.js analyze \
-  --component tests/fixtures/SaveButton.tsx \
-  --test tests/fixtures/SaveButton.weak.test.tsx
-```
-
-After publication, the intended command is:
-
-```bash
-npx ui-behavior-coverage analyze --component Component.tsx --test Component.test.tsx
+npm install -D ui-behavior-coverage
+npx ui-behavior-coverage scan .
 ```
 
 JSON output:
 
 ```bash
-ubc analyze --component Component.tsx --test Component.test.tsx --json
+npx ui-behavior-coverage scan . --json
 ```
 
-## v0.1 supported contract
+Single component/test pair:
 
-The first deterministic rule recognizes directly-bound native disabled semantics:
+```bash
+npx ui-behavior-coverage analyze \
+  --component src/SaveButton.tsx \
+  --test src/SaveButton.test.tsx
+```
+
+The shorter installed binary is also available:
+
+```bash
+ubc scan .
+```
+
+## What it measures
+
+- **Behavior Reach** — discovered behaviors that tests actually reach/exercise.
+- **Behavior Verification** — discovered behaviors with an explicit matching oracle.
+- **Verification Gap** — Reach minus Verification: tests interact with behavior but do not prove the outcome.
+
+For example, this reaches a controlled checkbox transition but only proves that *some* callback happened:
 
 ```tsx
-<button disabled={disabled} onClick={onSave}>
+await user.click(checkbox);
+expect(onChange).toHaveBeenCalled();
 ```
 
-and test bindings of the form:
+That remains **EXERCISED**.
+
+A stronger oracle can make the behavior **VERIFIED**:
 
 ```tsx
-<SaveButton disabled onSave={onSave} />
+expect(onChange).toHaveBeenCalledWith(
+  expect.objectContaining({
+    target: expect.objectContaining({
+      checked: true,
+    }),
+  }),
+);
 ```
 
-Verification currently recognizes:
+The same principle applies to rendered DOM state such as `toBeDisabled()`, `toBeChecked()`, `toHaveValue()`, visibility assertions, and explicit `aria-*` assertions.
+
+## Material UI support in the alpha
+
+The analyzer recognizes MUI statically from imports; **it does not install or execute `@mui/material`**.
+
+| Capability | Alpha support |
+|---|---|
+| Native `<button disabled>` callback suppression | ✅ |
+| MUI `Button` disabled/loading suppression | ✅ |
+| MUI `Button` rendered disabled state | ✅ |
+| MUI `Checkbox` disabled + controlled checked behavior | ✅ |
+| MUI `Switch` disabled + controlled checked behavior | ✅ |
+| standalone MUI `Radio` disabled + selection behavior | ✅ |
+| controlled MUI `TextField` callback/value evidence | ✅ |
+| MUI native-mode `Select` callback/value behavior | ✅ |
+| MUI Input/InputBase/OutlinedInput/FilledInput value state | ✅ conservative |
+| MUI Slider public value state | ✅ conservative |
+| Dialog/Popover/Menu/Modal public `open` visibility | ✅ conservative |
+| explicit public-prop-driven `aria-*` forwarding | ✅ conservative |
+| React Admin/RHF-style `useInput` / `useController` form state | ✅ limited |
+| local wrappers / simple prop forwarding / `styled()` wrappers | ✅ limited |
+| barrel exports and named aliases | ✅ |
+| TypeScript path aliases | ✅ |
+| configurable render-helper normalization | ✅ |
+| non-native MUI `Select` popup interaction semantics | ❌ |
+| arbitrary hooks/context/effects/state machines | ❌ |
+| browser layout, portals, computed CSS, animation timing | ❌ |
+| arbitrary custom form hooks | ❌ |
+
+“Conservative” means the analyzer requires a traceable public condition/evidence chain and leaves unsupported cases unclassified instead of inferring undocumented framework behavior.
+
+See [`docs/providers.md`](docs/providers.md) and [`docs/architecture.md`](docs/architecture.md) for the detailed boundaries.
+
+## Real React composition
+
+Project scanning can follow a useful subset of production composition patterns, including:
+
+```text
+public component prop
+       ↓
+local wrapper / barrel / alias
+       ↓
+simple prop forwarding or known normalization
+       ↓
+Material UI component
+       ↓
+semantic UI contract
+       ↓
+test render/setup
+       ↓
+matching assertion
+```
+
+Supported production-oriented paths include conservative boolean expressions, JSX spreads with override safeguards, recursive local component composition, `useThemeProps({ props, ... })`, and selected form bindings.
+
+Discovery telemetry is included in project reports so “zero behaviors” can be distinguished from “the scanner could not resolve this test surface.”
+
+## Versioned JSON
+
+`--json` output is versioned from the first alpha:
+
+```json
+{
+  "schemaVersion": "1",
+  "toolVersion": "0.1.0-alpha.0",
+  "reportType": "project",
+  "summary": {
+    "discovered": 9,
+    "exercised": 2,
+    "verified": 1,
+    "behaviorReach": 22.2,
+    "behaviorVerification": 11.1,
+    "verificationGap": 11.1
+  },
+  "report": {}
+}
+```
+
+Schema v1 also preserves the raw report fields at the top level for compatibility with the pre-schema alpha CLI. New automation should check `schemaVersion` and use `report`/`summary`.
+
+See [`docs/json-schema-v1.md`](docs/json-schema-v1.md).
+
+## Programmatic API
+
+The alpha is CommonJS-compatible and can also be loaded by ESM consumers through Node interoperability:
+
+```ts
+import {
+  analyzeProject,
+  REPORT_SCHEMA_VERSION,
+  TOOL_VERSION,
+} from 'ui-behavior-coverage';
+
+const report = analyzeProject('.');
+```
+
+The public API also exposes provider, project-discovery, scoring, reporting, MUI semantic extraction, and Box design-guidance helpers. Public APIs may still change during the `0.x` alpha series; JSON schema changes will be versioned.
+
+## Box and design-system guidance
+
+Visual policy remains intentionally separate from behavioral verification.
+
+The current design-guidance API starts with MUI `Box` `sx.borderRadius`:
 
 ```tsx
-expect(onSave).not.toHaveBeenCalled();
-expect(onSave).toHaveBeenCalledTimes(0);
+<Box sx={{ borderRadius: 2 }} />
 ```
 
-See [`docs/architecture.md`](docs/architecture.md) for deliberate limitations.
+Numeric MUI System border radii are represented as theme multipliers rather than assumed pixels. The default-theme 4px equivalent is informational only because applications can customize `theme.shape.borderRadius`.
+
+```ts
+import {
+  evaluateBoxBorderRadiusGuidance,
+  extractMaterialUiDesignObservations,
+} from 'ui-behavior-coverage';
+
+const observations = extractMaterialUiDesignObservations(source);
+const results = evaluateBoxBorderRadiusGuidance(observations, {
+  allowedThemeMultipliers: [1, 2],
+  allowedCssValues: ['50%'],
+});
+```
+
+See [`docs/design-guidance.md`](docs/design-guidance.md).
+
+## External evaluation
+
+The current release candidate has been evaluated against pinned scopes from five substantial public MUI repositories: OpenCTI, React Admin, MUI X Data Grid, Toolpad Core, and Clash Verge Rev.
+
+On the Phase 7 benchmark:
+
+- **226** test files were paired across the five scopes;
+- **9** conservative production contracts were discovered;
+- **2** were reached;
+- **1** was explicitly verified;
+- every currently reported production contract was manually reviewed for the alpha precision audit;
+- there are **0 known false VERIFIED** findings in that audited sample.
+
+This is a small evidence base, not a statistically strong accuracy claim. The benchmark deliberately keeps unsupported MUI X/Toolpad/Clash surfaces at zero rather than lowering inference precision to increase counts.
+
+See [`docs/evaluations/2026-08-13-phase7-semantic-evidence.md`](docs/evaluations/2026-08-13-phase7-semantic-evidence.md) and [`docs/evaluations/2026-08-13-alpha-precision-audit.md`](docs/evaluations/2026-08-13-alpha-precision-audit.md).
+
+## CLI exit codes
+
+```text
+0  analysis completed successfully
+1  invalid command or arguments
+2  analysis/filesystem failure
+```
+
+Verification gaps do not fail CI by default in `0.1.0-alpha.0`. Threshold-based CI policy is intentionally deferred until report semantics have more external validation.
+
+## Release quality gates
+
+The repository validates:
+
+```bash
+npm run check
+npm test
+npm run pack:check
+```
+
+`npm test` includes a clean consumer smoke path that packs the package, installs the resulting tarball into a temporary npm project, invokes the installed CLI, scans a fixture, and verifies CommonJS and ESM loading.
+
+See [`docs/release.md`](docs/release.md).
 
 ## Research context and independence
 
-This project is motivated by recent research on behavioral test adequacy, metamorphic relations, UI-component testing, and weak test oracles. It is an independent implementation with its own terminology and architecture. Project contributors should not copy paper prose, figures, prompts, datasets, supplemental artifacts, or source code unless a separate license has been verified to permit that reuse.
+This project is motivated by research on behavioral test adequacy, metamorphic relations, UI-component testing, and weak test oracles. It is an independent implementation with its own terminology and architecture. Contributors should not copy paper prose, figures, prompts, datasets, supplemental artifacts, or source code unless a separate license permits reuse.
 
 A key research inspiration is:
 
@@ -104,14 +239,9 @@ A key research inspiration is:
 
 The project is not affiliated with or endorsed by the paper's authors.
 
-## Roadmap
+## Contributing and security
 
-1. Prove the exercised-vs-verified model on precise native behaviors.
-2. Add richer assertion/data-flow matching.
-3. Add more native behavioral contracts: keyboard activation, checked/selected state, ARIA state coupling, and controlled input behavior.
-4. Add project discovery and Vitest/Jest integration.
-5. Evaluate on real open-source component libraries.
-6. Only then consider optional semantic/LLM-assisted contract inference.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for development and clean-room contribution rules. See [`SECURITY.md`](SECURITY.md) for security reporting guidance.
 
 ## License
 

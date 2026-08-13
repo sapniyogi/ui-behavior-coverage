@@ -1,5 +1,10 @@
 import ts from 'typescript';
-import type { BehaviorContract, BehaviorResult, BehaviorStatus } from '../core/model';
+import type {
+  BehaviorContract,
+  BehaviorExpectation,
+  BehaviorResult,
+  BehaviorStatus,
+} from '../core/model';
 
 interface RenderBinding {
   callbackVariable: string;
@@ -15,6 +20,8 @@ type ResolvedValue =
   | { kind: 'true' }
   | { kind: 'false' }
   | { kind: 'identifier'; text: string }
+  | { kind: 'string'; text: string }
+  | { kind: 'number'; value: number }
   | { kind: 'unknown' };
 
 interface PropResolution {
@@ -80,11 +87,16 @@ function expressionValue(expression: ts.Expression | undefined): ResolvedValue {
   if (expression.kind === ts.SyntaxKind.TrueKeyword) return { kind: 'true' };
   if (expression.kind === ts.SyntaxKind.FalseKeyword) return { kind: 'false' };
   if (ts.isIdentifier(expression)) return { kind: 'identifier', text: expression.text };
+  if (ts.isStringLiteralLike(expression)) return { kind: 'string', text: expression.text };
+  if (ts.isNumericLiteral(expression)) return { kind: 'number', value: Number(expression.text) };
   return { kind: 'unknown' };
 }
 
 function jsxAttributeValue(attribute: ts.JsxAttribute): ResolvedValue {
   if (!attribute.initializer) return { kind: 'true' };
+  if (ts.isStringLiteralLike(attribute.initializer)) {
+    return { kind: 'string', text: attribute.initializer.text };
+  }
   if (!ts.isJsxExpression(attribute.initializer)) return { kind: 'unknown' };
   return expressionValue(attribute.initializer.expression);
 }
@@ -104,8 +116,6 @@ function objectPropertyValue(
 
   for (const property of object.properties) {
     if (ts.isSpreadAssignment(property)) {
-      // Nested object spreads are deliberately not resolved yet. If a later spread
-      // could override a target property, mark that property's value unknown.
       value = { kind: 'unknown' };
       continue;
     }
@@ -141,7 +151,6 @@ function resolveComponentProps(
 
       const object = objects.get(property.expression.text);
       if (!object) {
-        // An unresolved spread may overwrite either property, so remain conservative.
         condition = { kind: 'unknown' };
         callback = { kind: 'unknown' };
         continue;
@@ -154,7 +163,7 @@ function resolveComponentProps(
       continue;
     }
 
-    if (!ts.isIdentifier(property.name)) continue;
+    if (!ts.isJsxAttribute(property) || !ts.isIdentifier(property.name)) continue;
 
     if (property.name.text === behavior.condition.prop) {
       condition = jsxAttributeValue(property);
@@ -164,6 +173,11 @@ function resolveComponentProps(
   }
 
   return { condition, callback };
+}
+
+function resolvedConditionMatches(value: ResolvedValue | undefined, expected: boolean | 'bound'): boolean {
+  if (expected === 'bound') return !!value && value.kind !== 'unknown';
+  return expected ? value?.kind === 'true' : value?.kind === 'false';
 }
 
 function matchingComponentElement(
@@ -204,7 +218,10 @@ function findRenderBinding(testBody: ts.Node, behavior: BehaviorContract): Rende
       if (component) {
         const props = resolveComponentProps(component, behavior, objects);
 
-        if (props.condition?.kind === 'true' && props.callback?.kind === 'identifier') {
+        if (
+          resolvedConditionMatches(props.condition, behavior.condition.value) &&
+          props.callback?.kind === 'identifier'
+        ) {
           binding = {
             callbackVariable: props.callback.text,
             renderPosition: node.getStart(),
@@ -266,7 +283,95 @@ function isZeroLiteral(node: ts.Expression | undefined): boolean {
   return !!node && ts.isNumericLiteral(node) && Number(node.text) === 0;
 }
 
-function verificationPositions(testBody: ts.Node, callbackVariable: string): number[] {
+function unwrapObjectContaining(expression: ts.Expression): ts.ObjectLiteralExpression | undefined {
+  if (ts.isObjectLiteralExpression(expression)) return expression;
+  if (
+    ts.isCallExpression(expression) &&
+    ts.isPropertyAccessExpression(expression.expression) &&
+    ts.isIdentifier(expression.expression.expression) &&
+    expression.expression.expression.text === 'expect' &&
+    expression.expression.name.text === 'objectContaining' &&
+    expression.arguments[0] &&
+    ts.isObjectLiteralExpression(expression.arguments[0])
+  ) {
+    return expression.arguments[0];
+  }
+  return undefined;
+}
+
+function booleanLiteralMatches(expression: ts.Expression, expected: boolean): boolean {
+  return expected
+    ? expression.kind === ts.SyntaxKind.TrueKeyword
+    : expression.kind === ts.SyntaxKind.FalseKeyword;
+}
+
+function objectContainsBooleanPath(
+  expression: ts.Expression,
+  path: readonly string[],
+  expected: boolean,
+): boolean {
+  const object = unwrapObjectContaining(expression);
+  if (!object || path.length === 0) return false;
+
+  const [head, ...tail] = path;
+  for (const property of object.properties) {
+    if (!ts.isPropertyAssignment(property) || propertyNameText(property.name) !== head) continue;
+    if (tail.length === 0) return booleanLiteralMatches(property.initializer, expected);
+    return objectContainsBooleanPath(property.initializer, tail, expected);
+  }
+
+  return false;
+}
+
+function objectContainsPath(expression: ts.Expression, path: readonly string[]): boolean {
+  const object = unwrapObjectContaining(expression);
+  if (!object || path.length === 0) return false;
+
+  const [head, ...tail] = path;
+  for (const property of object.properties) {
+    if (!ts.isPropertyAssignment(property) || propertyNameText(property.name) !== head) continue;
+    if (tail.length === 0) return true;
+    return objectContainsPath(property.initializer, tail);
+  }
+
+  return false;
+}
+
+function callbackSuppressionVerification(
+  call: ts.CallExpression,
+  matcher: string,
+  chain: ExpectChain,
+): boolean {
+  const negativeCalled = matcher === 'toHaveBeenCalled' && chain.negated;
+  const zeroCalls = matcher === 'toHaveBeenCalledTimes' && isZeroLiteral(call.arguments[0]);
+  return negativeCalled || zeroCalls;
+}
+
+function callbackEventBooleanVerification(
+  call: ts.CallExpression,
+  matcher: string,
+  expectation: Extract<BehaviorExpectation, { type: 'callback-event-boolean' }>,
+): boolean {
+  if (matcher !== 'toHaveBeenCalledWith' && matcher !== 'toHaveBeenLastCalledWith') return false;
+  return call.arguments.some((argument) =>
+    objectContainsBooleanPath(argument, expectation.path, expectation.value),
+  );
+}
+
+function callbackEventPathVerification(
+  call: ts.CallExpression,
+  matcher: string,
+  expectation: Extract<BehaviorExpectation, { type: 'callback-event-path' }>,
+): boolean {
+  if (matcher !== 'toHaveBeenCalledWith' && matcher !== 'toHaveBeenLastCalledWith') return false;
+  return call.arguments.some((argument) => objectContainsPath(argument, expectation.path));
+}
+
+function verificationPositions(
+  testBody: ts.Node,
+  behavior: BehaviorContract,
+  callbackVariable: string,
+): number[] {
   const positions: number[] = [];
 
   const visit = (node: ts.Node): void => {
@@ -275,10 +380,16 @@ function verificationPositions(testBody: ts.Node, callbackVariable: string): num
       const chain = inspectExpectChain(node.expression.expression);
 
       if (chain.target === callbackVariable) {
-        const negativeCalled = matcher === 'toHaveBeenCalled' && chain.negated;
-        const zeroCalls = matcher === 'toHaveBeenCalledTimes' && isZeroLiteral(node.arguments[0]);
+        let sufficient = false;
+        if (behavior.expectation.type === 'callback-not-called') {
+          sufficient = callbackSuppressionVerification(node, matcher, chain);
+        } else if (behavior.expectation.type === 'callback-event-boolean') {
+          sufficient = callbackEventBooleanVerification(node, matcher, behavior.expectation);
+        } else {
+          sufficient = callbackEventPathVerification(node, matcher, behavior.expectation);
+        }
 
-        if (negativeCalled || zeroCalls) positions.push(node.getStart());
+        if (sufficient) positions.push(node.getStart());
       }
     }
 
@@ -287,6 +398,49 @@ function verificationPositions(testBody: ts.Node, callbackVariable: string): num
 
   visit(testBody);
   return positions;
+}
+
+function conditionText(behavior: BehaviorContract): string {
+  return behavior.condition.value === 'bound'
+    ? `${behavior.condition.prop} is bound`
+    : `${behavior.condition.prop}=${behavior.condition.value}`;
+}
+
+function suggestedAssertion(behavior: BehaviorContract, callbackVariable: string): string {
+  if (behavior.expectation.type === 'callback-not-called') {
+    return `expect(${callbackVariable}).not.toHaveBeenCalled();`;
+  }
+
+  const [first, second] = behavior.expectation.path;
+  if (behavior.expectation.type === 'callback-event-boolean' && first && second) {
+    return `expect(${callbackVariable}).toHaveBeenCalledWith(expect.objectContaining({ ${first}: expect.objectContaining({ ${second}: ${behavior.expectation.value} }) }));`;
+  }
+
+  if (first && second) {
+    return `expect(${callbackVariable}).toHaveBeenCalledWith(expect.objectContaining({ ${first}: expect.objectContaining({ ${second}: <expected> }) }));`;
+  }
+
+  return `Verify ${callbackVariable} asserts ${behavior.expectation.path.join('.')} on the callback event.`;
+}
+
+function verificationReason(behavior: BehaviorContract): string {
+  if (behavior.expectation.type === 'callback-not-called') {
+    return 'The behavior is exercised and callback suppression is explicitly asserted after the interaction.';
+  }
+  if (behavior.expectation.type === 'callback-event-boolean') {
+    return `The behavior is exercised and ${behavior.expectation.path.join('.')}=${behavior.expectation.value} is explicitly asserted on the callback event.`;
+  }
+  return `The behavior is exercised and ${behavior.expectation.path.join('.')} is explicitly asserted on the callback event.`;
+}
+
+function exercisedReason(behavior: BehaviorContract, callbackVariable: string): string {
+  if (behavior.expectation.type === 'callback-not-called') {
+    return `The test renders ${conditionText(behavior)} and exercises ${behavior.event.eventName}, but never verifies that ${callbackVariable} was suppressed.`;
+  }
+  if (behavior.expectation.type === 'callback-event-boolean') {
+    return `The test renders ${conditionText(behavior)} and exercises ${behavior.event.eventName}, but never verifies ${behavior.expectation.path.join('.')}=${behavior.expectation.value} on ${callbackVariable}.`;
+  }
+  return `The test renders ${conditionText(behavior)} and exercises ${behavior.event.eventName}, but never verifies ${behavior.expectation.path.join('.')} on ${callbackVariable}.`;
 }
 
 function resultForTestCase(testCase: TestCase, behavior: BehaviorContract): BehaviorResult | undefined {
@@ -303,12 +457,12 @@ function resultForTestCase(testCase: TestCase, behavior: BehaviorContract): Beha
       status: 'discovered',
       testName: testCase.name,
       callbackVariable: binding.callbackVariable,
-      reason: `The test renders ${behavior.condition.prop}=true but does not exercise the ${behavior.event.eventName} interaction.`,
+      reason: `The test renders ${conditionText(behavior)} but does not exercise the ${behavior.event.eventName} interaction.`,
     };
   }
 
   const firstInteraction = interactions[0]!;
-  const verifications = verificationPositions(testCase.body, binding.callbackVariable).filter(
+  const verifications = verificationPositions(testCase.body, behavior, binding.callbackVariable).filter(
     (position) => position > firstInteraction,
   );
 
@@ -318,7 +472,7 @@ function resultForTestCase(testCase: TestCase, behavior: BehaviorContract): Beha
       status: 'verified',
       testName: testCase.name,
       callbackVariable: binding.callbackVariable,
-      reason: 'The behavior is exercised and the callback suppression is explicitly asserted after the interaction.',
+      reason: verificationReason(behavior),
     };
   }
 
@@ -327,8 +481,8 @@ function resultForTestCase(testCase: TestCase, behavior: BehaviorContract): Beha
     status: 'exercised',
     testName: testCase.name,
     callbackVariable: binding.callbackVariable,
-    reason: `The test renders ${behavior.condition.prop}=true and exercises ${behavior.event.eventName}, but never verifies that ${binding.callbackVariable} was suppressed.`,
-    suggestedAssertion: `expect(${binding.callbackVariable}).not.toHaveBeenCalled();`,
+    reason: exercisedReason(behavior, binding.callbackVariable),
+    suggestedAssertion: suggestedAssertion(behavior, binding.callbackVariable),
   };
 }
 
@@ -356,7 +510,7 @@ function resultForBehavior(testCases: TestCase[], behavior: BehaviorContract): B
     strongest ?? {
       behavior,
       status: 'discovered',
-      reason: `No test establishes ${behavior.componentName} with ${behavior.condition.prop}=true and a resolvable ${behavior.expectation.callbackProp} callback.`,
+      reason: `No test establishes ${behavior.componentName} with ${conditionText(behavior)} and a resolvable ${behavior.expectation.callbackProp} callback.`,
     }
   );
 }

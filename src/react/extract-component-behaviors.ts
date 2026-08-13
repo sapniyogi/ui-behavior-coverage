@@ -1,76 +1,61 @@
 import ts from 'typescript';
-import type { BehaviorContract } from '../core/model';
+import type { BehaviorContract, BehaviorExpectation } from '../core/model';
+import { materialUiBehaviorProvider } from '../providers/material-ui';
+import { materialUiCompositionProvider } from '../providers/material-ui-composition';
+import { nativeHtmlBehaviorProvider } from '../providers/native-html';
+import type { BehaviorProvider } from '../providers/types';
 
-interface AttributeValue {
-  kind: 'true' | 'false' | 'identifier' | 'other';
-  text?: string;
-}
+export const defaultBehaviorProviders: readonly BehaviorProvider[] = [
+  nativeHtmlBehaviorProvider,
+  materialUiBehaviorProvider,
+  materialUiCompositionProvider,
+];
 
-const nativeElementsWithDisabledSemantics = new Set([
-  'button',
-  'input',
-  'select',
-  'textarea',
-  'option',
-  'optgroup',
-  'fieldset',
-]);
-
-function jsxTagName(node: ts.JsxOpeningLikeElement): string | undefined {
-  if (ts.isIdentifier(node.tagName)) return node.tagName.text;
-  return undefined;
-}
-
-function getAttribute(
-  node: ts.JsxOpeningLikeElement,
-  name: string,
-): ts.JsxAttribute | undefined {
-  for (const property of node.attributes.properties) {
-    if (ts.isJsxAttribute(property) && ts.isIdentifier(property.name) && property.name.text === name) return property;
-  }
-  return undefined;
-}
-
-function readAttributeValue(attribute: ts.JsxAttribute): AttributeValue {
-  if (!attribute.initializer) return { kind: 'true' };
-
-  if (ts.isStringLiteral(attribute.initializer)) {
-    return { kind: 'other', text: attribute.initializer.text };
+function expectationKey(expectation: BehaviorExpectation): string {
+  if (expectation.type === 'callback-not-called') {
+    return `${expectation.type}:${expectation.callbackProp}`;
   }
 
-  if (!ts.isJsxExpression(attribute.initializer) || !attribute.initializer.expression) {
-    return { kind: 'other' };
+  if (expectation.type === 'callback-event-boolean') {
+    return [
+      expectation.type,
+      expectation.callbackProp,
+      expectation.path.join('.'),
+      String(expectation.value),
+    ].join(':');
   }
 
-  const expression = attribute.initializer.expression;
-  if (expression.kind === ts.SyntaxKind.TrueKeyword) return { kind: 'true' };
-  if (expression.kind === ts.SyntaxKind.FalseKeyword) return { kind: 'false' };
-  if (ts.isIdentifier(expression)) return { kind: 'identifier', text: expression.text };
-
-  return { kind: 'other', text: expression.getText() };
+  return [
+    expectation.type,
+    expectation.callbackProp,
+    expectation.path.join('.'),
+  ].join(':');
 }
 
-function componentNameForNode(node: ts.Node): string | undefined {
-  if (ts.isFunctionDeclaration(node) && node.name) return node.name.text;
-
-  if (
-    (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) &&
-    ts.isVariableDeclaration(node.parent) &&
-    ts.isIdentifier(node.parent.name)
-  ) {
-    return node.parent.name.text;
-  }
-
-  return undefined;
-}
-
-function lineOf(sourceFile: ts.SourceFile, node: ts.Node): number {
-  return sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
+/**
+ * Provider IDs are intentionally implementation-specific. Multiple providers may
+ * discover the same public contract through different evidence paths, so merge
+ * by observable semantics instead. Provider order is precedence order: the
+ * established direct provider wins over the broader composition provider when
+ * both describe the same behavior.
+ */
+function semanticBehaviorKey(behavior: BehaviorContract): string {
+  return [
+    behavior.provider,
+    behavior.componentName,
+    behavior.kind,
+    behavior.condition.prop,
+    String(behavior.condition.value),
+    behavior.event.handlerProp,
+    behavior.event.eventName,
+    expectationKey(behavior.expectation),
+  ].join('|');
 }
 
 export function extractComponentBehaviors(
   sourceText: string,
   fileName = 'component.tsx',
+  providers: readonly BehaviorProvider[] = defaultBehaviorProviders,
 ): BehaviorContract[] {
   const sourceFile = ts.createSourceFile(
     fileName,
@@ -80,59 +65,19 @@ export function extractComponentBehaviors(
     ts.ScriptKind.TSX,
   );
 
-  const behaviors: BehaviorContract[] = [];
+  const merged: BehaviorContract[] = [];
+  const seenIds = new Set<string>();
+  const seenSemantics = new Set<string>();
 
-  const visit = (node: ts.Node, currentComponent?: string): void => {
-    const componentName = componentNameForNode(node) ?? currentComponent;
-
-    if (componentName && (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node))) {
-      const tagName = jsxTagName(node);
-      if (tagName && nativeElementsWithDisabledSemantics.has(tagName)) {
-        const disabledAttribute = getAttribute(node, 'disabled');
-        const onClickAttribute = getAttribute(node, 'onClick');
-
-        if (disabledAttribute && onClickAttribute) {
-          const disabledValue = readAttributeValue(disabledAttribute);
-          const onClickValue = readAttributeValue(onClickAttribute);
-
-          if (
-            disabledValue.kind === 'identifier' &&
-            disabledValue.text &&
-            onClickValue.kind === 'identifier' &&
-            onClickValue.text
-          ) {
-            behaviors.push({
-              id: `${componentName}:${disabledValue.text}:${onClickValue.text}:click-suppressed`,
-              componentName,
-              kind: 'native-disabled-event-suppression',
-              title: `${disabledValue.text}=true prevents ${onClickValue.text} activation`,
-              condition: {
-                prop: disabledValue.text,
-                value: true,
-              },
-              event: {
-                handlerProp: onClickValue.text,
-                eventName: 'click',
-              },
-              expectation: {
-                type: 'callback-not-called',
-                callbackProp: onClickValue.text,
-              },
-              evidence: {
-                fileName,
-                line: lineOf(sourceFile, node),
-                snippet: node.getText(sourceFile),
-              },
-            });
-          }
-        }
-      }
+  for (const provider of providers) {
+    for (const behavior of provider.extract(sourceFile)) {
+      const semanticKey = semanticBehaviorKey(behavior);
+      if (seenIds.has(behavior.id) || seenSemantics.has(semanticKey)) continue;
+      seenIds.add(behavior.id);
+      seenSemantics.add(semanticKey);
+      merged.push(behavior);
     }
+  }
 
-    ts.forEachChild(node, (child) => visit(child, componentName));
-  };
-
-  visit(sourceFile);
-
-  return behaviors;
+  return merged;
 }
