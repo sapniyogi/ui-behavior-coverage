@@ -5,27 +5,39 @@ import { calculateScores } from '../core/scoring';
 import { extractDirectMaterialUiTestBehaviors } from '../providers/material-ui';
 import { analyzeTestsAgainstBehaviors } from '../react/analyze-tests';
 import { extractComponentBehaviors } from '../react/extract-component-behaviors';
-import { discoverProjectTargets, discoverTestFiles } from './discover';
+import { normalizeTestHarnessSource } from '../react/normalize-test-harness';
+import { discoverProject, discoverTestFiles, type ProjectDiscoveryOptions } from './discover';
 
 function relativePath(rootDir: string, file: string): string {
   return relative(rootDir, file) || '.';
 }
 
-export function analyzeProject(rootDir = '.'): ProjectAnalysisReport {
+export interface AnalyzeProjectOptions extends ProjectDiscoveryOptions {
+  /** Additional project-specific render helper names that should behave like Testing Library render(). */
+  renderHelpers?: readonly string[];
+}
+
+export function analyzeProject(
+  rootDir = '.',
+  options: AnalyzeProjectOptions = {},
+): ProjectAnalysisReport {
   const root = resolve(rootDir);
-  const targets = discoverProjectTargets(root);
+  const discovery = discoverProject(root, options);
   const reports: AnalysisReport[] = [];
   const uniqueTests = new Set<string>();
 
-  for (const target of targets) {
+  for (const target of discovery.targets) {
     for (const testFile of target.testFiles) uniqueTests.add(testFile);
 
     const componentFile = relativePath(root, target.componentFile);
     const testFiles = target.testFiles.map((file) => relativePath(root, file));
     const componentSource = readFileSync(target.componentFile, 'utf8');
-    const testSource = target.testFiles
+    const rawTestSource = target.testFiles
       .map((file) => `\n// ---- ${relativePath(root, file)} ----\n${readFileSync(file, 'utf8')}`)
       .join('\n');
+    const testSource = normalizeTestHarnessSource(rawTestSource, {
+      renderHelpers: options.renderHelpers,
+    });
 
     const behaviors = extractComponentBehaviors(componentSource, componentFile).filter((behavior) =>
       target.componentNames.includes(behavior.componentName),
@@ -41,7 +53,10 @@ export function analyzeProject(rootDir = '.'): ProjectAnalysisReport {
   }
 
   for (const testFile of discoverTestFiles(root)) {
-    const testSource = readFileSync(testFile, 'utf8');
+    const rawTestSource = readFileSync(testFile, 'utf8');
+    const testSource = normalizeTestHarnessSource(rawTestSource, {
+      renderHelpers: options.renderHelpers,
+    });
     const relativeTestFile = relativePath(root, testFile);
     const behaviors = extractDirectMaterialUiTestBehaviors(testSource, relativeTestFile);
     if (behaviors.length === 0) continue;
@@ -64,5 +79,6 @@ export function analyzeProject(rootDir = '.'): ProjectAnalysisReport {
     testFilesAnalyzed: uniqueTests.size,
     reports,
     scores: calculateScores(allResults),
+    discovery: discovery.telemetry,
   };
 }
