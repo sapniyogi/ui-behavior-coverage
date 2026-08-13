@@ -6,6 +6,7 @@ on:
       - agent/external-eval-5-repos
       - agent/phase-6-production-readiness
       - agent/phase-7-semantic-evidence
+      - agent/phase-7-5-alpha-readiness-v2
   workflow_dispatch:
 
 permissions:
@@ -40,6 +41,10 @@ jobs:
             repository: mui/toolpad
             scope: packages/toolpad-core
             sha: b2a4a69f343e98e6f3f7ebeba47dbc609c542e37
+          - slug: refine-mui
+            repository: refinedev/refine
+            scope: packages/mui
+            sha: 779d52a20e29b0307ac0df04d135beba434370dc
 
     steps:
       - name: Checkout analyzer
