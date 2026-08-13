@@ -19,10 +19,31 @@ export type RenderStateBehaviorKind =
   | 'mui-switch-disabled-render-state'
   | 'mui-switch-checked-render-state'
   | 'mui-radio-disabled-render-state'
-  | 'mui-radio-checked-render-state';
+  | 'mui-radio-checked-render-state'
+  | 'mui-text-field-value-render-state'
+  | 'mui-input-value-render-state'
+  | 'mui-input-base-value-render-state'
+  | 'mui-outlined-input-value-render-state'
+  | 'mui-filled-input-value-render-state'
+  | 'mui-select-value-render-state'
+  | 'mui-slider-value-render-state'
+  | 'mui-dialog-visibility-render-state'
+  | 'mui-drawer-visibility-render-state'
+  | 'mui-popover-visibility-render-state'
+  | 'mui-menu-visibility-render-state'
+  | 'mui-modal-visibility-render-state'
+  | 'mui-collapse-visibility-render-state'
+  | 'mui-fade-visibility-render-state'
+  | 'mui-grow-visibility-render-state'
+  | 'mui-slide-visibility-render-state'
+  | 'mui-zoom-visibility-render-state'
+  | 'mui-accordion-expanded-render-state'
+  | 'mui-toggle-button-selected-render-state'
+  | 'mui-accessibility-attribute-render-state'
+  | 'mui-form-controlled-value-render-state'
+  | 'mui-form-controlled-checked-render-state';
 
 export type BehaviorProviderName = 'native-html' | 'material-ui';
-
 export type BehaviorStatus = 'discovered' | 'exercised' | 'verified';
 
 export interface SourceEvidence {
@@ -31,27 +52,17 @@ export interface SourceEvidence {
   snippet: string;
 }
 
+export type SemanticPrimitive = string | number | boolean;
+
 export type BehaviorCondition = {
   prop: string;
   value: boolean | 'bound';
 };
 
 export type BehaviorExpectation =
-  | {
-      type: 'callback-not-called';
-      callbackProp: string;
-    }
-  | {
-      type: 'callback-event-boolean';
-      callbackProp: string;
-      path: string[];
-      value: boolean;
-    }
-  | {
-      type: 'callback-event-path';
-      callbackProp: string;
-      path: string[];
-    };
+  | { type: 'callback-not-called'; callbackProp: string }
+  | { type: 'callback-event-boolean'; callbackProp: string; path: string[]; value: boolean }
+  | { type: 'callback-event-path'; callbackProp: string; path: string[] };
 
 export interface BehaviorContract {
   id: string;
@@ -60,13 +71,31 @@ export interface BehaviorContract {
   kind: BehaviorKind;
   title: string;
   condition: BehaviorCondition;
-  event: {
-    handlerProp: string;
-    eventName: string;
-  };
+  event: { handlerProp: string; eventName: string };
   expectation: BehaviorExpectation;
   evidence: SourceEvidence;
 }
+
+type RenderStateExpectationCore =
+  | { type: 'element-boolean-state'; state: 'disabled' | 'checked'; value: boolean }
+  | { type: 'element-value-state'; state: 'value'; valueSource: 'condition' }
+  | { type: 'element-visibility-state'; visible: boolean }
+  | { type: 'element-attribute-state'; attribute: string; valueSource: 'condition' }
+  | {
+      type: 'form-controlled-state';
+      state: 'value' | 'checked';
+      fieldKeyProp: 'source' | 'name';
+      containers: readonly ('defaultValues' | 'record' | 'values')[];
+    };
+
+/**
+ * The optional compatibility fields keep older render-state providers source-compatible
+ * while semantic expectation variants are discriminated by `type`.
+ */
+export type RenderStateExpectation = RenderStateExpectationCore & {
+  state?: 'disabled' | 'checked' | 'value';
+  value?: boolean;
+};
 
 export interface RenderStateBehaviorContract {
   id: string;
@@ -75,14 +104,8 @@ export interface RenderStateBehaviorContract {
   kind: RenderStateBehaviorKind;
   title: string;
   condition: BehaviorCondition;
-  event: {
-    eventName: 'render';
-  };
-  expectation: {
-    type: 'element-boolean-state';
-    state: 'disabled' | 'checked';
-    value: boolean;
-  };
+  event: { eventName: 'render' };
+  expectation: RenderStateExpectation;
   evidence: SourceEvidence;
 }
 
@@ -147,10 +170,7 @@ export type DesignValue =
       /** Informational only. MUI's default theme uses 4px, but applications may override it. */
       defaultThemePixels: number;
     }
-  | {
-      kind: 'css-literal';
-      value: string;
-    };
+  | { kind: 'css-literal'; value: string };
 
 export interface DesignObservation {
   id: string;

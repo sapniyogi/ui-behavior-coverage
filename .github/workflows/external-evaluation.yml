@@ -5,6 +5,7 @@ on:
     branches:
       - agent/external-eval-5-repos
       - agent/phase-6-production-readiness
+      - agent/phase-7-semantic-evidence
   workflow_dispatch:
 
 permissions:
@@ -43,18 +44,15 @@ jobs:
     steps:
       - name: Checkout analyzer
         uses: actions/checkout@v4
-
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-
       - name: Build analyzer
         run: |
           npm ci
           npm run build
-
       - name: Clone pinned target repository scope
         shell: bash
         run: |
@@ -71,7 +69,6 @@ jobs:
           ACTUAL_SHA=$(git rev-parse HEAD)
           test "$ACTUAL_SHA" = "${{ matrix.sha }}"
           printf '%s\n' "$ACTUAL_SHA" > "../${{ matrix.slug }}-sha.txt"
-
       - name: Inventory target scope
         shell: bash
         run: |
@@ -82,7 +79,6 @@ jobs:
           MUI_FILES=$(grep -RIl --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' '@mui/material' "$ROOT" 2>/dev/null | wc -l | tr -d ' ')
           printf '{"testFiles":%s,"tsxFiles":%s,"muiImportFiles":%s}\n' "$TEST_FILES" "$TSX_FILES" "$MUI_FILES" > "external/${{ matrix.slug }}-inventory.json"
           cat "external/${{ matrix.slug }}-inventory.json"
-
       - name: Run ui-behavior-coverage
         shell: bash
         run: |
@@ -90,7 +86,6 @@ jobs:
           ROOT="external/${{ matrix.slug }}/${{ matrix.scope }}"
           node dist/src/cli/index.js scan "$ROOT" --json > "external/${{ matrix.slug }}-analysis.json"
           cat "external/${{ matrix.slug }}-analysis.json"
-
       - name: Build reproducible evaluation record
         shell: bash
         env:
@@ -106,26 +101,9 @@ jobs:
           const upstreamSha = fs.readFileSync(`external/${slug}-sha.txt`, 'utf8').trim();
           const inventory = JSON.parse(fs.readFileSync(`external/${slug}-inventory.json`, 'utf8'));
           const analysis = JSON.parse(fs.readFileSync(`external/${slug}-analysis.json`, 'utf8'));
-          const record = {
-            repository: repo,
-            scope,
-            upstreamSha,
-            inventory,
-            analysis,
-          };
-          fs.writeFileSync(`external/${slug}-evaluation.json`, JSON.stringify(record, null, 2));
-          console.log(JSON.stringify({
-            repository: repo,
-            scope,
-            upstreamSha,
-            ...inventory,
-            discovery: analysis.discovery,
-            scores: analysis.scores,
-            componentsAnalyzed: analysis.componentsAnalyzed,
-            testFilesAnalyzed: analysis.testFilesAnalyzed,
-          }, null, 2));
+          fs.writeFileSync(`external/${slug}-evaluation.json`, JSON.stringify({ repository: repo, scope, upstreamSha, inventory, analysis }, null, 2));
+          console.log(JSON.stringify({ repository: repo, scope, upstreamSha, ...inventory, discovery: analysis.discovery, scores: analysis.scores, componentsAnalyzed: analysis.componentsAnalyzed, testFilesAnalyzed: analysis.testFilesAnalyzed }, null, 2));
           NODE
-
       - name: Upload evaluation record
         uses: actions/upload-artifact@v4
         with:
@@ -145,7 +123,6 @@ jobs:
           pattern: external-eval-*
           path: evaluation-results
           merge-multiple: true
-
       - name: Print combined summary
         shell: bash
         run: |
@@ -153,24 +130,12 @@ jobs:
           const fs = require('node:fs');
           const path = require('node:path');
           const dir = 'evaluation-results';
-          const rows = fs.existsSync(dir)
-            ? fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')))
-            : [];
+          const rows = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))) : [];
           rows.sort((a, b) => a.repository.localeCompare(b.repository));
-          const combined = rows.map((row) => ({
-            repository: row.repository,
-            scope: row.scope,
-            upstreamSha: row.upstreamSha,
-            inventory: row.inventory,
-            componentsAnalyzed: row.analysis.componentsAnalyzed,
-            testFilesAnalyzed: row.analysis.testFilesAnalyzed,
-            discovery: row.analysis.discovery,
-            scores: row.analysis.scores,
-          }));
+          const combined = rows.map((row) => ({ repository: row.repository, scope: row.scope, upstreamSha: row.upstreamSha, inventory: row.inventory, componentsAnalyzed: row.analysis.componentsAnalyzed, testFilesAnalyzed: row.analysis.testFilesAnalyzed, discovery: row.analysis.discovery, scores: row.analysis.scores }));
           console.log(JSON.stringify(combined, null, 2));
           fs.writeFileSync('external-evaluation-summary.json', JSON.stringify(combined, null, 2));
           NODE
-
       - name: Upload combined summary
         uses: actions/upload-artifact@v4
         with:
