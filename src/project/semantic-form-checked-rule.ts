@@ -22,7 +22,7 @@ export function extractSemanticFormCheckedRule(sourceFile: ts.SourceFile): Rende
             title: 'form field controls checked state',
             condition: { prop: field.fieldKeyProp, value: 'bound' },
             event: { eventName: 'render' },
-            expectation: { type: 'form-controlled-state', state: 'checked', fieldKeyProp: field.fieldKeyProp, containers: ['defaultValues'] },
+            expectation: { type: 'form-controlled-state', state: 'checked', fieldKeyProp: field.fieldKeyProp, containers: ['defaultValues', 'record', 'values'] },
             evidence: { fileName: sourceFile.fileName, line: lineOf(sourceFile, node), snippet: node.getText(sourceFile) },
           });
         }

@@ -23,7 +23,7 @@ export function extractSemanticFormValueRule(sourceFile: ts.SourceFile): RenderS
             title: 'form field controls rendered value',
             condition: { prop: field.fieldKeyProp, value: 'bound' },
             event: { eventName: 'render' },
-            expectation: { type: 'form-controlled-state', state: 'value', fieldKeyProp: field.fieldKeyProp, containers: ['defaultValues'] },
+            expectation: { type: 'form-controlled-state', state: 'value', fieldKeyProp: field.fieldKeyProp, containers: ['defaultValues', 'record', 'values'] },
             evidence: { fileName: sourceFile.fileName, line: lineOf(sourceFile, node), snippet: node.getText(sourceFile) },
           });
         }
