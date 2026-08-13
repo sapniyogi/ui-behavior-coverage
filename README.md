@@ -190,20 +190,22 @@ See [`docs/design-guidance.md`](docs/design-guidance.md).
 
 ## External evaluation
 
-The current release candidate has been evaluated against pinned scopes from five substantial public MUI repositories: OpenCTI, React Admin, MUI X Data Grid, Toolpad Core, and Clash Verge Rev.
+The current alpha release candidate has been evaluated against pinned scopes from **six** substantial public MUI repositories: OpenCTI, React Admin, MUI X Data Grid, Toolpad Core, Clash Verge Rev, and Refine MUI.
 
-On the Phase 7 benchmark:
+Across the current pinned alpha corpus:
 
-- **226** test files were paired across the five scopes;
-- **9** conservative production contracts were discovered;
+- **250** test files were paired/analyzed across the six scopes;
+- **14** conservative production contracts were discovered;
 - **2** were reached;
 - **1** was explicitly verified;
-- every currently reported production contract was manually reviewed for the alpha precision audit;
+- all **14** currently reported production contracts were manually reviewed for the alpha precision audit;
 - there are **0 known false VERIFIED** findings in that audited sample.
 
-This is a small evidence base, not a statistically strong accuracy claim. The benchmark deliberately keeps unsupported MUI X/Toolpad/Clash surfaces at zero rather than lowering inference precision to increase counts.
+The original five-repository Phase 7 benchmark accounted for 226 paired test files and 9 contracts. Phase 7.5 adds Refine MUI at a pinned commit, where 24 test files are paired and 5 additional valid `loading=true → disabled=true` wrapper contracts are discovered. Those Refine contracts are not marked reached because the paired tests do not establish a statically resolvable `loading=true` condition.
 
-See [`docs/evaluations/2026-08-13-phase7-semantic-evidence.md`](docs/evaluations/2026-08-13-phase7-semantic-evidence.md) and [`docs/evaluations/2026-08-13-alpha-precision-audit.md`](docs/evaluations/2026-08-13-alpha-precision-audit.md).
+This remains a small evidence base, not a statistically strong accuracy claim. React Admin is currently the only benchmark repository with reached/verified contracts. The benchmark deliberately leaves unsupported or unproven surfaces unclassified rather than lowering inference precision to increase counts.
+
+See [`docs/evaluations/2026-08-13-phase7-semantic-evidence.md`](docs/evaluations/2026-08-13-phase7-semantic-evidence.md), [`docs/evaluations/alpha-readiness.md`](docs/evaluations/alpha-readiness.md), and [`docs/evaluations/2026-08-13-alpha-precision-audit.md`](docs/evaluations/2026-08-13-alpha-precision-audit.md).
 
 ## CLI exit codes
 
