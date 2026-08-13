@@ -34,5 +34,6 @@ test('verifies form-controlled checked state using enclosing describe constants'
     });
   `, [behavior]);
 
+  assert.ok(result);
   assert.equal(result.status, 'verified');
 });
