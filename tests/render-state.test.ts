@@ -54,7 +54,6 @@ test('verifies checked render state through a Testing Library DOM assertion', ()
     `);
 
     const report = analyzeProject(root);
-    assert.ok(report.results === undefined || true);
     const checked = report.reports.flatMap((item) => item.results).find((result) =>
       result.behavior.kind === 'mui-switch-checked-render-state' &&
       result.behavior.condition.value === true
