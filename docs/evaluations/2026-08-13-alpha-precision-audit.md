@@ -1,6 +1,6 @@
 # Alpha precision audit — 2026-08-13
 
-Every production contract from the pinned Phase 7 benchmark was manually reviewed before the first npm alpha.
+Every production contract included in the current pinned alpha benchmark has been manually reviewed before the first npm alpha.
 
 | Scope | Finding | Status | Audit |
 |---|---|---|---|
@@ -11,7 +11,14 @@ Every production contract from the pinned Phase 7 benchmark was manually reviewe
 | React Admin | `BooleanInput.readOnly → Switch.disabled` | DISCOVERED | valid |
 | React Admin | `DatagridRow.selectable=false → Checkbox.disabled` | EXERCISED | valid; disabled DOM state is not asserted |
 | React Admin | form default `isPublished=true → Switch.checked=true` | VERIFIED | valid; test asserts checked state |
+| Refine MUI | `CloneButton.loading=true → MUI Button disabled=true` | DISCOVERED | valid; MUI Button props are forwarded to the underlying Button |
+| Refine MUI | `CreateButton.loading=true → MUI Button disabled=true` | DISCOVERED | valid; MUI Button props are forwarded to the underlying Button |
+| Refine MUI | `EditButton.loading=true → MUI Button disabled=true` | DISCOVERED | valid; MUI Button props are forwarded to the underlying Button |
+| Refine MUI | `ListButton.loading=true → MUI Button disabled=true` | DISCOVERED | valid; MUI Button props are forwarded to the underlying Button |
+| Refine MUI | `ShowButton.loading=true → MUI Button disabled=true` | DISCOVERED | valid; MUI Button props are forwarded to the underlying Button |
 
-Small-sample results: **9/9 valid contracts**, **2/2 correctly classified reached cases**, **1/1 correctly classified VERIFIED case**, and **0 known false VERIFIED findings**.
+The five Refine wrappers use Refine button prop types parameterized with Material UI `ButtonProps` and forward their remaining MUI props to the underlying `<Button>`. The analyzer does not mark those contracts reached because the paired tests do not establish `loading=true` in a statically resolvable render.
 
-These percentages are release-gate observations, not statistically established accuracy claims. The sample is intentionally small. A known false VERIFIED classification is release-blocking for this alpha.
+Small-sample results: **14/14 valid contracts**, **2/2 correctly classified reached cases**, **1/1 correctly classified VERIFIED case**, and **0 known false VERIFIED findings**.
+
+These percentages are release-gate observations, not statistically established accuracy claims. The sample remains intentionally small. A known false VERIFIED classification is release-blocking for this alpha.
