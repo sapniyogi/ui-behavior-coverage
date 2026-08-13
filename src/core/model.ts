@@ -52,3 +52,11 @@ export interface AnalysisReport {
   results: BehaviorResult[];
   scores: CoverageScores;
 }
+
+export interface ProjectAnalysisReport {
+  rootDir: string;
+  componentsAnalyzed: number;
+  testFilesAnalyzed: number;
+  reports: AnalysisReport[];
+  scores: CoverageScores;
+}
