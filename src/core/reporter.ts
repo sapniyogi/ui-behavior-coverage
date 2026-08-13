@@ -1,4 +1,10 @@
-import type { AnalysisReport, BehaviorResult, BehaviorStatus, ProjectAnalysisReport } from './model';
+import type {
+  AnalysisReport,
+  BehaviorProviderName,
+  BehaviorResult,
+  BehaviorStatus,
+  ProjectAnalysisReport,
+} from './model';
 
 const statusLabel: Record<BehaviorStatus, string> = {
   discovered: 'DISCOVERED',
@@ -12,11 +18,17 @@ const statusGlyph: Record<BehaviorStatus, string> = {
   verified: '✓',
 };
 
+const providerLabel: Record<BehaviorProviderName, string> = {
+  'native-html': 'Native HTML',
+  'material-ui': 'Material UI',
+};
+
 function appendResult(lines: string[], result: BehaviorResult): void {
   lines.push(`${statusGlyph[result.status]} ${result.behavior.componentName}: ${result.behavior.title}`);
-  lines.push(`  Status: ${statusLabel[result.status]}`);
-  if (result.testName) lines.push(`  Test:   ${result.testName}`);
-  lines.push(`  Why:    ${result.reason}`);
+  lines.push(`  Provider: ${providerLabel[result.behavior.provider]}`);
+  lines.push(`  Status:   ${statusLabel[result.status]}`);
+  if (result.testName) lines.push(`  Test:     ${result.testName}`);
+  lines.push(`  Why:      ${result.reason}`);
   if (result.suggestedAssertion) lines.push(`  Suggestion: ${result.suggestedAssertion}`);
 }
 
@@ -65,7 +77,7 @@ export function formatProjectTextReport(report: ProjectAnalysisReport): string {
 
   if (report.reports.length === 0) {
     lines.push('');
-    lines.push('No React/TSX component-test pairs were discovered.');
+    lines.push('No supported React/TSX or Material UI test targets were discovered.');
     return lines.join('\n');
   }
 

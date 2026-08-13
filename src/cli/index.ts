@@ -23,7 +23,8 @@ function usage(): string {
     '',
     'Scope:',
     '  React/TSX source + Jest/Vitest-style tests using render(), click(), and expect().',
-    '  Project scan discovers relative TSX imports that are rendered directly in test JSX.',
+    '  Providers: native HTML and Material UI Button/Checkbox behavioral contracts.',
+    '  Project scan supports local TSX components and supported direct @mui/material test imports.',
   ].join('\n');
 }
 
