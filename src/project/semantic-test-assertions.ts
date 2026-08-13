@@ -143,9 +143,14 @@ function assertionMatches(
   return false;
 }
 
-export function findVerificationPosition(testBody: ts.Node, behavior: RenderStateBehaviorContract, evidence: RenderEvidence): number | undefined {
+export function findVerificationPosition(
+  testBody: ts.Node,
+  behavior: RenderStateBehaviorContract,
+  evidence: RenderEvidence,
+  seed?: TestEnvironment,
+): number | undefined {
   const bindings = collectQueryBindings(testBody);
-  const env = collectTestEnvironment(testBody);
+  const env = collectTestEnvironment(testBody, seed);
   let result: number | undefined;
   const visit = (node: ts.Node): void => {
     if (result !== undefined) return;
