@@ -35,27 +35,20 @@ function muiComponentFromModule(moduleName: string): MuiStateComponent | undefin
 
 function collectMuiImports(sourceFile: ts.SourceFile): Map<string, MuiStateComponent> {
   const imports = new Map<string, MuiStateComponent>();
-
   for (const statement of sourceFile.statements) {
     if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
     const clause = statement.importClause;
     if (!clause || clause.isTypeOnly) continue;
     const moduleName = statement.moduleSpecifier.text;
-
     const defaultComponent = muiComponentFromModule(moduleName);
     if (defaultComponent && clause.name) imports.set(clause.name.text, defaultComponent);
-
-    if (moduleName !== '@mui/material' || !clause.namedBindings || !ts.isNamedImports(clause.namedBindings)) {
-      continue;
-    }
-
+    if (moduleName !== '@mui/material' || !clause.namedBindings || !ts.isNamedImports(clause.namedBindings)) continue;
     for (const element of clause.namedBindings.elements) {
       if (element.isTypeOnly) continue;
       const importedName = (element.propertyName?.text ?? element.name.text) as MuiStateComponent;
       if (supported.has(importedName)) imports.set(element.name.text, importedName);
     }
   }
-
   return imports;
 }
 
@@ -63,7 +56,6 @@ function nestedFunction(expression: ts.Expression | undefined): FunctionNode | u
   if (!expression) return undefined;
   if (ts.isArrowFunction(expression) || ts.isFunctionExpression(expression)) return expression;
   if (!ts.isCallExpression(expression)) return undefined;
-
   for (const argument of expression.arguments) {
     if (ts.isArrowFunction(argument) || ts.isFunctionExpression(argument)) return argument;
   }
@@ -75,21 +67,17 @@ function publicBindings(fn: FunctionNode): Pick<ComponentContext, 'localToPublic
   const propsObjects: PropsObjectBinding[] = [];
   const parameter = fn.parameters[0];
   if (!parameter) return { localToPublic, propsObjects };
-
   if (ts.isIdentifier(parameter.name)) {
     propsObjects.push({ name: parameter.name.text, excluded: new Set() });
     return { localToPublic, propsObjects };
   }
-
   if (!ts.isObjectBindingPattern(parameter.name)) return { localToPublic, propsObjects };
   const excluded = new Set<string>();
-
   for (const element of parameter.name.elements) {
     if (element.dotDotDotToken && ts.isIdentifier(element.name)) {
       propsObjects.push({ name: element.name.text, excluded: new Set(excluded) });
       continue;
     }
-
     const publicName = element.propertyName &&
       (ts.isIdentifier(element.propertyName) || ts.isStringLiteralLike(element.propertyName))
       ? element.propertyName.text
@@ -100,19 +88,121 @@ function publicBindings(fn: FunctionNode): Pick<ComponentContext, 'localToPublic
     excluded.add(publicName);
     if (ts.isIdentifier(element.name)) localToPublic.set(element.name.text, publicName);
   }
-
   return { localToPublic, propsObjects };
+}
+
+function propsObject(context: ComponentContext, name: string): PropsObjectBinding | undefined {
+  return context.propsObjects.find((binding) => binding.name === name);
+}
+
+function transparentPublicPropsExpression(
+  expression: ts.Expression | undefined,
+  context: ComponentContext,
+): PropsObjectBinding | undefined {
+  if (!expression) return undefined;
+  if (ts.isParenthesizedExpression(expression) || ts.isAsExpression(expression) || ts.isTypeAssertionExpression(expression)) {
+    return transparentPublicPropsExpression(expression.expression, context);
+  }
+  if (ts.isIdentifier(expression)) return propsObject(context, expression.text);
+  if (
+    ts.isCallExpression(expression) &&
+    ts.isIdentifier(expression.expression) &&
+    expression.expression.text === 'useThemeProps'
+  ) {
+    const options = expression.arguments[0];
+    if (!options || !ts.isObjectLiteralExpression(options)) return undefined;
+    for (const property of options.properties) {
+      if (ts.isShorthandPropertyAssignment(property) && property.name.text === 'props') {
+        return propsObject(context, 'props');
+      }
+      if (
+        ts.isPropertyAssignment(property) &&
+        (ts.isIdentifier(property.name) || ts.isStringLiteralLike(property.name)) &&
+        property.name.text === 'props'
+      ) {
+        return transparentPublicPropsExpression(property.initializer, context);
+      }
+    }
+  }
+  return undefined;
+}
+
+function applyObjectBindingFromPublicProps(
+  pattern: ts.ObjectBindingPattern,
+  source: PropsObjectBinding,
+  context: ComponentContext,
+): boolean {
+  let changed = false;
+  const excluded = new Set(source.excluded);
+  for (const element of pattern.elements) {
+    if (element.dotDotDotToken && ts.isIdentifier(element.name)) {
+      if (!propsObject(context, element.name.text)) {
+        context.propsObjects.push({ name: element.name.text, excluded: new Set(excluded) });
+        changed = true;
+      }
+      continue;
+    }
+    const publicName = element.propertyName &&
+      (ts.isIdentifier(element.propertyName) || ts.isStringLiteralLike(element.propertyName))
+      ? element.propertyName.text
+      : ts.isIdentifier(element.name)
+        ? element.name.text
+        : undefined;
+    if (!publicName) continue;
+    excluded.add(publicName);
+    if (ts.isIdentifier(element.name) && !context.localToPublic.has(element.name.text)) {
+      context.localToPublic.set(element.name.text, publicName);
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+function enrichPublicBindings(context: ComponentContext): void {
+  if (!context.fn.body) return;
+  const declarations: ts.VariableDeclaration[] = [];
+  const collect = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node)) declarations.push(node);
+    ts.forEachChild(node, collect);
+  };
+  collect(context.fn.body);
+  let changed = true;
+  let passes = 0;
+  while (changed && passes < 8) {
+    changed = false;
+    passes += 1;
+    for (const declaration of declarations) {
+      const source = transparentPublicPropsExpression(declaration.initializer, context);
+      if (!source) continue;
+      if (ts.isIdentifier(declaration.name)) {
+        if (!propsObject(context, declaration.name.text)) {
+          context.propsObjects.push({ name: declaration.name.text, excluded: new Set(source.excluded) });
+          changed = true;
+        }
+        continue;
+      }
+      if (ts.isObjectBindingPattern(declaration.name)) {
+        changed = applyObjectBindingFromPublicProps(declaration.name, source, context) || changed;
+      }
+    }
+  }
 }
 
 function collectComponents(sourceFile: ts.SourceFile): ComponentContext[] {
   const contexts: ComponentContext[] = [];
   const visit = (node: ts.Node): void => {
     if (ts.isFunctionDeclaration(node) && node.name && /^[A-Z]/.test(node.name.text)) {
-      contexts.push({ name: node.name.text, fn: node, ...publicBindings(node) });
+      const context = { name: node.name.text, fn: node, ...publicBindings(node) };
+      enrichPublicBindings(context);
+      contexts.push(context);
     }
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && /^[A-Z]/.test(node.name.text)) {
       const fn = nestedFunction(node.initializer);
-      if (fn) contexts.push({ name: node.name.text, fn, ...publicBindings(fn) });
+      if (fn) {
+        const context = { name: node.name.text, fn, ...publicBindings(fn) };
+        enrichPublicBindings(context);
+        contexts.push(context);
+      }
     }
     ts.forEachChild(node, visit);
   };
@@ -131,10 +221,6 @@ function unwrap(expression: ts.Expression): ts.Expression {
   return current;
 }
 
-function propsObject(context: ComponentContext, name: string): PropsObjectBinding | undefined {
-  return context.propsObjects.find((binding) => binding.name === name);
-}
-
 function directPublicProp(expression: ts.Expression, context: ComponentContext): string | undefined {
   const current = unwrap(expression);
   if (ts.isIdentifier(current)) return context.localToPublic.get(current.text);
@@ -150,19 +236,16 @@ function booleanBinding(expression: ts.Expression, context: ComponentContext): B
   const current = unwrap(expression);
   const direct = directPublicProp(current, context);
   if (direct) return { prop: direct, inverted: false };
-
   if (ts.isPrefixUnaryExpression(current) && current.operator === ts.SyntaxKind.ExclamationToken) {
     const nested = booleanBinding(current.operand, context);
     return nested ? { prop: nested.prop, inverted: !nested.inverted } : undefined;
   }
-
   if (
     ts.isCallExpression(current) &&
     ts.isIdentifier(current.expression) &&
     current.expression.text === 'Boolean' &&
     current.arguments[0]
   ) return booleanBinding(current.arguments[0], context);
-
   return undefined;
 }
 
@@ -180,30 +263,22 @@ function truthyDependencies(
   const current = unwrap(expression);
   const binding = booleanBinding(current, context);
   if (binding) return [{ prop: binding.prop, when: !binding.inverted }];
-
   if (ts.isBinaryExpression(current) && current.operatorToken.kind === ts.SyntaxKind.BarBarToken) {
     const left = truthyDependencies(current.left, context);
     const right = truthyDependencies(current.right, context);
     return left && right ? [...left, ...right] : undefined;
   }
-
   if (!ts.isBinaryExpression(current)) return undefined;
   const operator = current.operatorToken.kind;
   const leftProp = directPublicProp(current.left, context);
   const rightProp = directPublicProp(current.right, context);
   const leftBoolean = booleanLiteral(current.left);
   const rightBoolean = booleanLiteral(current.right);
-
   const equality = operator === ts.SyntaxKind.EqualsEqualsEqualsToken || operator === ts.SyntaxKind.EqualsEqualsToken;
   const inequality = operator === ts.SyntaxKind.ExclamationEqualsEqualsToken || operator === ts.SyntaxKind.ExclamationEqualsToken;
   if (!equality && !inequality) return undefined;
-
-  if (leftProp && rightBoolean !== undefined) {
-    return [{ prop: leftProp, when: equality ? rightBoolean : !rightBoolean }];
-  }
-  if (rightProp && leftBoolean !== undefined) {
-    return [{ prop: rightProp, when: equality ? leftBoolean : !leftBoolean }];
-  }
+  if (leftProp && rightBoolean !== undefined) return [{ prop: leftProp, when: equality ? rightBoolean : !rightBoolean }];
+  if (rightProp && leftBoolean !== undefined) return [{ prop: rightProp, when: equality ? leftBoolean : !leftBoolean }];
   return undefined;
 }
 
@@ -289,7 +364,6 @@ function inferUsage(
   } else if (forwardsProp(node, 'disabled', context)) {
     pushState(behaviors, sourceFile, node, context.name, disabledKind(component), 'disabled', true, 'disabled', true);
   }
-
   if (component === 'Button') {
     const loading = attributeExpression(node, 'loading');
     if (loading) {
@@ -301,7 +375,6 @@ function inferUsage(
     }
     return;
   }
-
   const checkedExpression = attributeExpression(node, 'checked');
   const checked = checkedExpression
     ? booleanBinding(checkedExpression, context)
@@ -309,7 +382,6 @@ function inferUsage(
       ? { prop: 'checked', inverted: false }
       : undefined;
   if (!checked) return;
-
   for (const publicValue of [false, true] as const) {
     pushState(
       behaviors,
@@ -330,11 +402,9 @@ export function extractMaterialUiRenderStateBehaviors(
 ): RenderStateBehaviorContract[] {
   const muiImports = collectMuiImports(sourceFile);
   if (muiImports.size === 0) return [];
-
   const contexts = collectComponents(sourceFile);
   const functions = new Set(contexts.map((context) => context.fn));
   const behaviors: RenderStateBehaviorContract[] = [];
-
   for (const context of contexts) {
     const visit = (node: ts.Node): void => {
       if (node !== context.fn && functions.has(node as FunctionNode)) return;
@@ -347,7 +417,6 @@ export function extractMaterialUiRenderStateBehaviors(
     };
     if (context.fn.body) visit(context.fn.body);
   }
-
   const seen = new Set<string>();
   return behaviors.filter((behavior) => {
     const key = [
