@@ -1,5 +1,6 @@
 export type {
   AnalysisReport,
+  AnyBehaviorContract,
   BehaviorCondition,
   BehaviorContract,
   BehaviorExpectation,
@@ -15,6 +16,8 @@ export type {
   DiscoverySkipReason,
   ProjectAnalysisReport,
   ProjectDiscoveryTelemetry,
+  RenderStateBehaviorContract,
+  RenderStateBehaviorKind,
 } from './core/model';
 export { calculateScores } from './core/scoring';
 export { formatProjectTextReport, formatTextReport } from './core/reporter';
@@ -39,11 +42,18 @@ export type {
 } from './project/discover';
 export { analyzeProject } from './project/analyze-project';
 export type { AnalyzeProjectOptions } from './project/analyze-project';
+export { analyzeRenderStateTests } from './project/analyze-render-state-tests';
 export { resolveProjectComponentBehaviors } from './project/compose-project-behaviors';
 export type {
   ResolveProjectComponentBehaviorsInput,
   ResolveProjectComponentBehaviorsOptions,
 } from './project/compose-project-behaviors';
+export { resolveProjectRenderStateBehaviors } from './project/compose-render-state-behaviors';
+export type {
+  ResolveProjectRenderStateInput,
+  ResolveProjectRenderStateOptions,
+} from './project/compose-render-state-behaviors';
+export { extractMaterialUiRenderStateBehaviors } from './project/material-ui-render-state';
 export {
   parseProjectSourceFile,
   readProjectCompilerOptions,
