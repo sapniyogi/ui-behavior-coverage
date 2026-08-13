@@ -5,7 +5,9 @@ import { calculateScores } from '../core/scoring';
 import { extractDirectMaterialUiTestBehaviors } from '../providers/material-ui';
 import { analyzeTestsAgainstBehaviors } from '../react/analyze-tests';
 import { normalizeTestHarnessSource } from '../react/normalize-test-harness';
+import { analyzeRenderStateTests } from './analyze-render-state-tests';
 import { resolveProjectComponentBehaviors } from './compose-project-behaviors';
+import { resolveProjectRenderStateBehaviors } from './compose-render-state-behaviors';
 import { discoverProject, discoverTestFiles, type ProjectDiscoveryOptions } from './discover';
 
 function relativePath(rootDir: string, file: string): string {
@@ -39,17 +41,28 @@ export function analyzeProject(
     const testSource = normalizeTestHarnessSource(rawTestSource, {
       renderHelpers: options.renderHelpers,
     });
+    const compositionOptions = {
+      tsconfigPath: options.tsconfigPath,
+      maxDepth: options.maxCompositionDepth,
+    };
 
-    const behaviors = resolveProjectComponentBehaviors({
+    const callbackBehaviors = resolveProjectComponentBehaviors({
       rootDir: root,
       componentFile: target.componentFile,
       componentNames: target.componentNames,
-      options: {
-        tsconfigPath: options.tsconfigPath,
-        maxDepth: options.maxCompositionDepth,
-      },
+      options: compositionOptions,
     });
-    const results = analyzeTestsAgainstBehaviors(testSource, behaviors, testFiles.join(', '));
+    const renderStateBehaviors = resolveProjectRenderStateBehaviors({
+      rootDir: root,
+      componentFile: target.componentFile,
+      componentNames: target.componentNames,
+      options: compositionOptions,
+    });
+
+    const results = [
+      ...analyzeTestsAgainstBehaviors(testSource, callbackBehaviors, testFiles.join(', ')),
+      ...analyzeRenderStateTests(testSource, renderStateBehaviors, testFiles.join(', ')),
+    ];
 
     reports.push({
       componentFile,
