@@ -1,100 +1,177 @@
 # ui-behavior-coverage
 
-Behavioral verification coverage for UI component tests, with an emerging design-system conformance layer.
+Experimental behavioral verification coverage for React component tests, with first-class Material UI semantics.
 
-Traditional code coverage answers **"did this code execute?"** This project asks a different question:
+Traditional code coverage asks **“did this code execute?”** `ui-behavior-coverage` asks a different question:
 
-> **Did the test explicitly verify the behavior it exercised?**
+> **Did the test explicitly verify the UI behavior it exercised?**
 
-## Status
+> **Alpha status:** `0.1.0-alpha.0` is intentionally conservative and incomplete. Unsupported patterns are skipped rather than guessed. Treat findings as test-quality evidence to review, not as a replacement for test execution or browser automation.
 
-Early research-driven MVP (`0.1.0-alpha`). The implementation is deterministic and conservative: behavioral contracts are expanded only when they can be inferred with explainable evidence and guarded against false positives.
-
-## Core metrics
-
-- **Behavior Reach** — proportion of discovered behaviors exercised by tests.
-- **Behavior Verification** — proportion explicitly verified by assertions.
-- **Verification Gap** — reach minus verification; a signal that tests touch behavior without proving the result.
-
-## CLI
+## Install and scan
 
 ```bash
-npm install
-npm run build
-
-node dist/src/cli/index.js analyze \
-  --component tests/fixtures/SaveButton.tsx \
-  --test tests/fixtures/SaveButton.weak.test.tsx
+npm install -D ui-behavior-coverage
+npx ui-behavior-coverage scan .
 ```
 
-After publication, the intended command is:
+JSON output:
 
 ```bash
-npx ui-behavior-coverage analyze --component Component.tsx --test Component.test.tsx
+npx ui-behavior-coverage scan . --json
+```
+
+Single component/test pair:
+
+```bash
+npx ui-behavior-coverage analyze \
+  --component src/SaveButton.tsx \
+  --test src/SaveButton.test.tsx
+```
+
+The shorter installed binary is also available:
+
+```bash
 ubc scan .
-ubc scan packages/ui --json
 ```
 
-`scan` conservatively discovers tests that directly render relatively imported TSX components, groups matching tests for a component, and recognizes supported direct Material UI package imports.
+## What it measures
 
-## Material UI behavior support
+- **Behavior Reach** — discovered behaviors that tests actually reach/exercise.
+- **Behavior Verification** — discovered behaviors with an explicit matching oracle.
+- **Verification Gap** — Reach minus Verification: tests interact with behavior but do not prove the outcome.
 
-The Material UI provider recognizes supported components statically from imports. `ui-behavior-coverage` does **not** depend on `@mui/material` at runtime.
-
-Current contracts:
-
-- `Button`: disabled and loading activation suppression.
-- `Checkbox`: disabled suppression and controlled checked-state transitions.
-- `Switch`: disabled suppression and controlled checked-state transitions.
-- standalone `Radio`: disabled suppression and unchecked-to-checked selection.
-- controlled `TextField`: typing must explicitly verify `onChange` `event.target.value`.
-- controlled native-mode `Select`: `selectOptions` must explicitly verify `onChange` `event.target.value`.
-
-For state/value contracts, callback presence alone is not enough:
+For example, this reaches a controlled checkbox transition but only proves that *some* callback happened:
 
 ```tsx
-expect(onChange).toHaveBeenCalled(); // still EXERCISED
+await user.click(checkbox);
+expect(onChange).toHaveBeenCalled();
 ```
 
-A stronger oracle verifies the documented event field:
+That remains **EXERCISED**.
+
+A stronger oracle can make the behavior **VERIFIED**:
 
 ```tsx
 expect(onChange).toHaveBeenCalledWith(
   expect.objectContaining({
-    target: expect.objectContaining({ checked: true }),
+    target: expect.objectContaining({
+      checked: true,
+    }),
   }),
 );
 ```
 
-or:
+The same principle applies to rendered DOM state such as `toBeDisabled()`, `toBeChecked()`, `toHaveValue()`, visibility assertions, and explicit `aria-*` assertions.
 
-```tsx
-expect(onChange).toHaveBeenLastCalledWith(
-  expect.objectContaining({
-    target: expect.objectContaining({ value: 'Ada' }),
-  }),
-);
+## Material UI support in the alpha
+
+The analyzer recognizes MUI statically from imports; **it does not install or execute `@mui/material`**.
+
+| Capability | Alpha support |
+|---|---|
+| Native `<button disabled>` callback suppression | ✅ |
+| MUI `Button` disabled/loading suppression | ✅ |
+| MUI `Button` rendered disabled state | ✅ |
+| MUI `Checkbox` disabled + controlled checked behavior | ✅ |
+| MUI `Switch` disabled + controlled checked behavior | ✅ |
+| standalone MUI `Radio` disabled + selection behavior | ✅ |
+| controlled MUI `TextField` callback/value evidence | ✅ |
+| MUI native-mode `Select` callback/value behavior | ✅ |
+| MUI Input/InputBase/OutlinedInput/FilledInput value state | ✅ conservative |
+| MUI Slider public value state | ✅ conservative |
+| Dialog/Popover/Menu/Modal public `open` visibility | ✅ conservative |
+| explicit public-prop-driven `aria-*` forwarding | ✅ conservative |
+| React Admin/RHF-style `useInput` / `useController` form state | ✅ limited |
+| local wrappers / simple prop forwarding / `styled()` wrappers | ✅ limited |
+| barrel exports and named aliases | ✅ |
+| TypeScript path aliases | ✅ |
+| configurable render-helper normalization | ✅ |
+| non-native MUI `Select` popup interaction semantics | ❌ |
+| arbitrary hooks/context/effects/state machines | ❌ |
+| browser layout, portals, computed CSS, animation timing | ❌ |
+| arbitrary custom form hooks | ❌ |
+
+“Conservative” means the analyzer requires a traceable public condition/evidence chain and leaves unsupported cases unclassified instead of inferring undocumented framework behavior.
+
+See [`docs/providers.md`](docs/providers.md) and [`docs/architecture.md`](docs/architecture.md) for the detailed boundaries.
+
+## Real React composition
+
+Project scanning can follow a useful subset of production composition patterns, including:
+
+```text
+public component prop
+       ↓
+local wrapper / barrel / alias
+       ↓
+simple prop forwarding or known normalization
+       ↓
+Material UI component
+       ↓
+semantic UI contract
+       ↓
+test render/setup
+       ↓
+matching assertion
 ```
 
-Non-native Material UI Select is deliberately not assigned native `selectOptions` semantics yet; its popup/menu interaction model will get a separate rule.
+Supported production-oriented paths include conservative boolean expressions, JSX spreads with override safeguards, recursive local component composition, `useThemeProps({ props, ... })`, and selected form bindings.
 
-See [`docs/providers.md`](docs/providers.md) for provider details.
+Discovery telemetry is included in project reports so “zero behaviors” can be distinguished from “the scanner could not resolve this test surface.”
 
-## Realistic MUI evaluation
+## Versioned JSON
 
-Phase 5 includes an application-style `PreferencesForm` fixture combining `Box`, `Switch`, `Radio`, `TextField`, and native `Select`. The accompanying test suite intentionally verifies only part of the inferred behavior space so a project scan exposes remaining coverage rather than producing a synthetic perfect score.
+`--json` output is versioned from the first alpha:
 
-## Box and subtle design guidance
+```json
+{
+  "schemaVersion": "1",
+  "toolVersion": "0.1.0-alpha.0",
+  "reportType": "project",
+  "summary": {
+    "discovered": 9,
+    "exercised": 2,
+    "verified": 1,
+    "behaviorReach": 22.2,
+    "behaviorVerification": 11.1,
+    "verificationGap": 11.1
+  },
+  "report": {}
+}
+```
 
-Visual/design-system policy is intentionally separate from behavioral test coverage.
+Schema v1 also preserves the raw report fields at the top level for compatibility with the pre-schema alpha CLI. New automation should check `schemaVersion` and use `report`/`summary`.
 
-Phase 5 starts a Material UI design-observation API with `Box` `sx.borderRadius`:
+See [`docs/json-schema-v1.md`](docs/json-schema-v1.md).
+
+## Programmatic API
+
+The alpha is CommonJS-compatible and can also be loaded by ESM consumers through Node interoperability:
+
+```ts
+import {
+  analyzeProject,
+  REPORT_SCHEMA_VERSION,
+  TOOL_VERSION,
+} from 'ui-behavior-coverage';
+
+const report = analyzeProject('.');
+```
+
+The public API also exposes provider, project-discovery, scoring, reporting, MUI semantic extraction, and Box design-guidance helpers. Public APIs may still change during the `0.x` alpha series; JSON schema changes will be versioned.
+
+## Box and design-system guidance
+
+Visual policy remains intentionally separate from behavioral verification.
+
+The current design-guidance API starts with MUI `Box` `sx.borderRadius`:
 
 ```tsx
 <Box sx={{ borderRadius: 2 }} />
 ```
 
-For MUI System, numeric border-radius values are theme multipliers. The extractor records the multiplier and, for convenience, the equivalent value under MUI's default 4px shape radius. Because applications can override the theme, that default-pixel value is informational only.
+Numeric MUI System border radii are represented as theme multipliers rather than assumed pixels. The default-theme 4px equivalent is informational only because applications can customize `theme.shape.borderRadius`.
 
 ```ts
 import {
@@ -109,32 +186,52 @@ const results = evaluateBoxBorderRadiusGuidance(observations, {
 });
 ```
 
-This design layer can later grow to spacing, colors, typography, shadows, responsive rules, and component variants without contaminating Behavior Reach or Behavior Verification.
-
 See [`docs/design-guidance.md`](docs/design-guidance.md).
 
-## Native HTML contract
+## External evaluation
 
-The initial deterministic rule recognizes directly-bound native disabled semantics:
+The current release candidate has been evaluated against pinned scopes from five substantial public MUI repositories: OpenCTI, React Admin, MUI X Data Grid, Toolpad Core, and Clash Verge Rev.
 
-```tsx
-<button disabled={disabled} onClick={onSave}>
+On the Phase 7 benchmark:
+
+- **226** test files were paired across the five scopes;
+- **9** conservative production contracts were discovered;
+- **2** were reached;
+- **1** was explicitly verified;
+- every currently reported production contract was manually reviewed for the alpha precision audit;
+- there are **0 known false VERIFIED** findings in that audited sample.
+
+This is a small evidence base, not a statistically strong accuracy claim. The benchmark deliberately keeps unsupported MUI X/Toolpad/Clash surfaces at zero rather than lowering inference precision to increase counts.
+
+See [`docs/evaluations/2026-08-13-phase7-semantic-evidence.md`](docs/evaluations/2026-08-13-phase7-semantic-evidence.md) and [`docs/evaluations/2026-08-13-alpha-precision-audit.md`](docs/evaluations/2026-08-13-alpha-precision-audit.md).
+
+## CLI exit codes
+
+```text
+0  analysis completed successfully
+1  invalid command or arguments
+2  analysis/filesystem failure
 ```
 
-and verifies suppression with assertions such as:
+Verification gaps do not fail CI by default in `0.1.0-alpha.0`. Threshold-based CI policy is intentionally deferred until report semantics have more external validation.
 
-```tsx
-expect(onSave).not.toHaveBeenCalled();
-expect(onSave).toHaveBeenCalledTimes(0);
+## Release quality gates
+
+The repository validates:
+
+```bash
+npm run check
+npm test
+npm run pack:check
 ```
 
-## Project discovery boundaries
+`npm test` includes a clean consumer smoke path that packs the package, installs the resulting tarball into a temporary npm project, invokes the installed CLI, scans a fixture, and verifies CommonJS and ESM loading.
 
-Local component discovery pairs a test with component source only when a runtime relative import resolves to TSX and the imported identifier is rendered directly. Type-only imports, unresolved files, namespace JSX, JavaScript/JSX files, framework-specific path aliases, and unsupported package imports remain outside the current boundary. Supported Material UI package imports are an explicit provider-backed exception.
+See [`docs/release.md`](docs/release.md).
 
 ## Research context and independence
 
-This project is motivated by research on behavioral test adequacy, metamorphic relations, UI-component testing, and weak test oracles. It is an independent implementation with its own terminology and architecture. Contributors should not copy paper prose, figures, prompts, datasets, supplemental artifacts, or source code unless a separate license has been verified to permit reuse.
+This project is motivated by research on behavioral test adequacy, metamorphic relations, UI-component testing, and weak test oracles. It is an independent implementation with its own terminology and architecture. Contributors should not copy paper prose, figures, prompts, datasets, supplemental artifacts, or source code unless a separate license permits reuse.
 
 A key research inspiration is:
 
@@ -142,17 +239,9 @@ A key research inspiration is:
 
 The project is not affiliated with or endorsed by the paper's authors.
 
-## Roadmap
+## Contributing and security
 
-1. Prove exercised-vs-verified measurement on precise native behavior.
-2. Add richer assertion/data-flow matching.
-3. Add project discovery, packaging, and CI quality gates.
-4. Add provider-based Material UI Button/Checkbox support.
-5. Expand to Switch, Radio, TextField, native Select, realistic MUI fixtures, and initial Box design guidance.
-6. Add non-native Select semantics and broaden design-token analysis.
-7. Evaluate against larger real-world open-source MUI suites.
-8. Add additional providers such as Ant Design, Radix, Chakra, or internal enterprise design systems.
-9. Only then consider optional semantic/LLM-assisted contract inference.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for development and clean-room contribution rules. See [`SECURITY.md`](SECURITY.md) for security reporting guidance.
 
 ## License
 
