@@ -1,0 +1,164 @@
+name: External evaluation
+
+on:
+  push:
+    branches:
+      - agent/external-eval-5-repos
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate:
+    name: ${{ matrix.slug }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - slug: opencti
+            repository: OpenCTI-Platform/opencti
+            scope: opencti-platform/opencti-front
+          - slug: clash-verge-rev
+            repository: clash-verge-rev/clash-verge-rev
+            scope: src
+          - slug: react-admin
+            repository: marmelab/react-admin
+            scope: packages/ra-ui-materialui
+          - slug: mui-x-data-grid
+            repository: mui/mui-x
+            scope: packages/x-data-grid
+          - slug: toolpad-core
+            repository: mui/toolpad
+            scope: packages/toolpad-core
+
+    steps:
+      - name: Checkout analyzer
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Build analyzer
+        run: |
+          npm ci
+          npm run build
+
+      - name: Clone target repository scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p external
+          git clone --depth 1 --filter=blob:none --sparse "https://github.com/${{ matrix.repository }}.git" "external/${{ matrix.slug }}"
+          cd "external/${{ matrix.slug }}"
+          git sparse-checkout set "${{ matrix.scope }}"
+          git rev-parse HEAD > ../${{ matrix.slug }}-sha.txt
+
+      - name: Inventory target scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="external/${{ matrix.slug }}/${{ matrix.scope }}"
+          TEST_FILES=$(find "$ROOT" -type f \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.ts' -o -name '*.spec.tsx' \) | wc -l | tr -d ' ')
+          TSX_FILES=$(find "$ROOT" -type f -name '*.tsx' | wc -l | tr -d ' ')
+          MUI_FILES=$(grep -RIl --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' '@mui/material' "$ROOT" 2>/dev/null | wc -l | tr -d ' ')
+          printf '{"testFiles":%s,"tsxFiles":%s,"muiImportFiles":%s}\n' "$TEST_FILES" "$TSX_FILES" "$MUI_FILES" > "external/${{ matrix.slug }}-inventory.json"
+          cat "external/${{ matrix.slug }}-inventory.json"
+
+      - name: Run ui-behavior-coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="external/${{ matrix.slug }}/${{ matrix.scope }}"
+          node dist/src/cli/index.js scan "$ROOT" --json > "external/${{ matrix.slug }}-analysis.json"
+          cat "external/${{ matrix.slug }}-analysis.json"
+
+      - name: Build reproducible evaluation record
+        shell: bash
+        env:
+          REPOSITORY: ${{ matrix.repository }}
+          SCOPE: ${{ matrix.scope }}
+          SLUG: ${{ matrix.slug }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const repo = process.env.REPOSITORY;
+          const scope = process.env.SCOPE;
+          const slug = process.env.SLUG;
+          const upstreamSha = fs.readFileSync(`external/${slug}-sha.txt`, 'utf8').trim();
+          const inventory = JSON.parse(fs.readFileSync(`external/${slug}-inventory.json`, 'utf8'));
+          const analysis = JSON.parse(fs.readFileSync(`external/${slug}-analysis.json`, 'utf8'));
+          const record = {
+            repository: repo,
+            scope,
+            upstreamSha,
+            inventory,
+            analysis,
+          };
+          fs.writeFileSync(`external/${slug}-evaluation.json`, JSON.stringify(record, null, 2));
+          console.log(JSON.stringify({
+            repository: repo,
+            scope,
+            upstreamSha,
+            ...inventory,
+            scores: analysis.scores,
+            componentsAnalyzed: analysis.componentsAnalyzed,
+            testFilesAnalyzed: analysis.testFilesAnalyzed,
+          }, null, 2));
+          NODE
+
+      - name: Upload evaluation record
+        uses: actions/upload-artifact@v4
+        with:
+          name: external-eval-${{ matrix.slug }}
+          path: external/${{ matrix.slug }}-evaluation.json
+          if-no-files-found: error
+
+  summarize:
+    name: Summary
+    needs: evaluate
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download evaluation records
+        uses: actions/download-artifact@v4
+        with:
+          pattern: external-eval-*
+          path: evaluation-results
+          merge-multiple: true
+
+      - name: Print combined summary
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const dir = 'evaluation-results';
+          const rows = fs.existsSync(dir)
+            ? fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')))
+            : [];
+          rows.sort((a, b) => a.repository.localeCompare(b.repository));
+          const combined = rows.map((row) => ({
+            repository: row.repository,
+            scope: row.scope,
+            upstreamSha: row.upstreamSha,
+            inventory: row.inventory,
+            componentsAnalyzed: row.analysis.componentsAnalyzed,
+            testFilesAnalyzed: row.analysis.testFilesAnalyzed,
+            scores: row.analysis.scores,
+          }));
+          console.log(JSON.stringify(combined, null, 2));
+          fs.writeFileSync('external-evaluation-summary.json', JSON.stringify(combined, null, 2));
+          NODE
+
+      - name: Upload combined summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: external-evaluation-summary
+          path: external-evaluation-summary.json
+          if-no-files-found: error
