@@ -1,11 +1,17 @@
 export type {
   AnalysisReport,
+  BehaviorCondition,
   BehaviorContract,
   BehaviorExpectation,
   BehaviorProviderName,
   BehaviorResult,
   BehaviorStatus,
+  BorderRadiusGuidance,
   CoverageScores,
+  DesignGuidanceResult,
+  DesignObservation,
+  DesignObservationKind,
+  DesignValue,
   ProjectAnalysisReport,
 } from './core/model';
 export { calculateScores } from './core/scoring';
@@ -21,5 +27,7 @@ export { nativeHtmlBehaviorProvider } from './providers/native-html';
 export {
   materialUiBehaviorProvider,
   extractDirectMaterialUiTestBehaviors,
+  extractMaterialUiDesignObservations,
 } from './providers/material-ui';
+export { evaluateBoxBorderRadiusGuidance } from './design/material-ui';
 export type { BehaviorProvider } from './providers/types';
