@@ -34,6 +34,11 @@ function walkFiles(rootDir: string): string[] {
   return files;
 }
 
+export function discoverTestFiles(rootDir: string): string[] {
+  const root = resolve(rootDir);
+  return walkFiles(root).filter((candidate) => testFilePattern.test(candidate)).sort();
+}
+
 function runtimeImportBindings(clause: ts.ImportClause | undefined): ImportBinding[] {
   if (!clause || clause.isTypeOnly) return [];
 
@@ -71,9 +76,7 @@ function resolveComponentModule(testFile: string, specifier: string): string | u
   if (!specifier.startsWith('.')) return undefined;
 
   const base = resolve(dirname(testFile), specifier);
-  const candidates = extname(base)
-    ? [base]
-    : [`${base}.tsx`, join(base, 'index.tsx')];
+  const candidates = extname(base) ? [base] : [`${base}.tsx`, join(base, 'index.tsx')];
 
   for (const candidate of candidates) {
     if (
@@ -96,13 +99,7 @@ interface ImportedComponentReference {
 
 function importedComponentsUsedInJsx(testFile: string): ImportedComponentReference[] {
   const source = readFileSync(testFile, 'utf8');
-  const sourceFile = ts.createSourceFile(
-    testFile,
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TSX,
-  );
+  const sourceFile = ts.createSourceFile(testFile, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const renderedNames = jsxIdentifierNames(sourceFile);
   const references: ImportedComponentReference[] = [];
 
@@ -114,9 +111,6 @@ function importedComponentsUsedInJsx(testFile: string): ImportedComponentReferen
 
     for (const binding of runtimeImportBindings(statement.importClause)) {
       if (!renderedNames.has(binding.localName)) continue;
-
-      // Aliased named imports are deliberately skipped for now because the analyzer
-      // matches JSX tag names to source component names directly.
       if (binding.importedName && binding.importedName !== binding.localName) continue;
 
       references.push({
@@ -130,13 +124,9 @@ function importedComponentsUsedInJsx(testFile: string): ImportedComponentReferen
 }
 
 export function discoverProjectTargets(rootDir: string): ProjectTarget[] {
-  const root = resolve(rootDir);
-  const targets = new Map<
-    string,
-    { componentNames: Set<string>; testFiles: Set<string> }
-  >();
+  const targets = new Map<string, { componentNames: Set<string>; testFiles: Set<string> }>();
 
-  for (const file of walkFiles(root).filter((candidate) => testFilePattern.test(candidate)).sort()) {
+  for (const file of discoverTestFiles(rootDir)) {
     for (const reference of importedComponentsUsedInJsx(file)) {
       const existing = targets.get(reference.componentFile) ?? {
         componentNames: new Set<string>(),

@@ -1,4 +1,11 @@
-export type BehaviorKind = 'native-disabled-event-suppression';
+export type BehaviorKind =
+  | 'native-disabled-event-suppression'
+  | 'mui-button-disabled-event-suppression'
+  | 'mui-button-loading-event-suppression'
+  | 'mui-checkbox-disabled-change-suppression'
+  | 'mui-checkbox-checked-toggle';
+
+export type BehaviorProviderName = 'native-html' | 'material-ui';
 
 export type BehaviorStatus = 'discovered' | 'exercised' | 'verified';
 
@@ -8,23 +15,33 @@ export interface SourceEvidence {
   snippet: string;
 }
 
+export type BehaviorExpectation =
+  | {
+      type: 'callback-not-called';
+      callbackProp: string;
+    }
+  | {
+      type: 'callback-event-boolean';
+      callbackProp: string;
+      path: string[];
+      value: boolean;
+    };
+
 export interface BehaviorContract {
   id: string;
   componentName: string;
+  provider: BehaviorProviderName;
   kind: BehaviorKind;
   title: string;
   condition: {
     prop: string;
-    value: true;
+    value: boolean;
   };
   event: {
     handlerProp: string;
     eventName: string;
   };
-  expectation: {
-    type: 'callback-not-called';
-    callbackProp: string;
-  };
+  expectation: BehaviorExpectation;
   evidence: SourceEvidence;
 }
 

@@ -5,13 +5,13 @@
 `ui-behavior-coverage` measures whether UI behavior is *verified*, not merely whether code is executed.
 Do not collapse the states `discovered`, `exercised`, and `verified` into ordinary code coverage.
 
-## v0.1 boundaries
+## Current boundaries
 
 - React/TSX only.
 - Deterministic static analysis only; no LLM calls.
 - Jest/Vitest-style test syntax.
 - Testing Library-style `render()` and click interaction.
-- First supported contract: native disabled controls suppress a directly-bound click callback.
+- Built-in providers: native HTML and selected Material UI Button/Checkbox contracts.
 - Prefer low false-positive rates over broad inference.
 
 ## Clean-room/IP rule
@@ -33,7 +33,17 @@ Run `npm test` before committing.
 
 ## Project discovery guardrails
 
-- Project scanning may only pair a test with a component when a runtime relative import resolves to TSX and that imported identifier is rendered directly in JSX.
-- Skip type-only imports, package imports, unresolved files, namespace JSX, and aliased named imports until explicit support and false-positive tests exist.
+- Pair a local test with component source only when a runtime relative import resolves to TSX and that imported identifier is rendered directly in JSX.
+- Skip type-only imports, unresolved files, namespace JSX, unsupported package imports, and unsupported aliases until explicit support and false-positive tests exist.
+- Supported framework package imports may be handled only by a framework-specific provider with explicit import recognition.
 - Group all matching tests for one component before calculating its final behavioral status; do not double-count a behavior because multiple test files import the same component.
 - CI must run type-checking, the complete test suite, and npm package dry-run validation.
+
+## Behavior-provider guardrails
+
+- UI-framework semantics must come from a framework-specific provider; never infer MUI behavior from a capitalized JSX name alone.
+- A provider must identify framework components from runtime imports before assigning framework semantics.
+- Do not add a runtime dependency on a supported UI framework unless execution of that framework becomes an explicit product requirement.
+- Framework behavior rules must be tied to documented public API semantics and have false-positive tests for similarly named custom components.
+- Strong-oracle verification must validate the documented outcome, not merely callback invocation. For controlled MUI Checkbox transitions, `toHaveBeenCalled()` alone remains `EXERCISED`.
+- Keep providers deterministic and explainable; optional semantic/LLM inference belongs in a separate later layer.
