@@ -9,7 +9,9 @@ export type BehaviorKind =
   | 'mui-radio-disabled-change-suppression'
   | 'mui-radio-checked-select'
   | 'mui-text-field-value-change'
-  | 'mui-select-native-value-change'
+  | 'mui-select-native-value-change';
+
+export type RenderStateBehaviorKind =
   | 'mui-button-disabled-render-state'
   | 'mui-button-loading-render-state'
   | 'mui-checkbox-disabled-render-state'
@@ -49,15 +51,6 @@ export type BehaviorExpectation =
       type: 'callback-event-path';
       callbackProp: string;
       path: string[];
-    }
-  | {
-      type: 'element-boolean-state';
-      state: 'disabled' | 'checked';
-      value: boolean;
-      /** Internal composition carrier; render-state analysis does not treat this as a callback. */
-      callbackProp: string;
-      /** Internal compatibility field for generic expectation composition. */
-      path: string[];
     };
 
 export interface BehaviorContract {
@@ -75,8 +68,28 @@ export interface BehaviorContract {
   evidence: SourceEvidence;
 }
 
+export interface RenderStateBehaviorContract {
+  id: string;
+  componentName: string;
+  provider: 'material-ui';
+  kind: RenderStateBehaviorKind;
+  title: string;
+  condition: BehaviorCondition;
+  event: {
+    eventName: 'render';
+  };
+  expectation: {
+    type: 'element-boolean-state';
+    state: 'disabled' | 'checked';
+    value: boolean;
+  };
+  evidence: SourceEvidence;
+}
+
+export type AnyBehaviorContract = BehaviorContract | RenderStateBehaviorContract;
+
 export interface BehaviorResult {
-  behavior: BehaviorContract;
+  behavior: AnyBehaviorContract;
   status: BehaviorStatus;
   testName?: string;
   callbackVariable?: string;
