@@ -23,7 +23,10 @@
     "build": "npm run clean && tsc -p tsconfig.json",
     "check": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && node --test dist/tests/*.test.js",
-    "smoke": "npm run build && node dist/src/cli/index.js analyze --component tests/fixtures/SaveButton.tsx --test tests/fixtures/SaveButton.weak.test.tsx"
+    "smoke": "npm run build && node dist/src/cli/index.js analyze --component tests/fixtures/SaveButton.tsx --test tests/fixtures/SaveButton.weak.test.tsx",
+    "prepack": "npm run build",
+    "pack:check": "npm pack --dry-run",
+    "ci": "npm run check && npm test && npm run pack:check"
   },
   "dependencies": {
     "typescript": "^5.8.3"

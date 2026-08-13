@@ -71,6 +71,15 @@ JSON output:
 ubc analyze --component Component.tsx --test Component.test.tsx --json
 ```
 
+Project scan:
+
+```bash
+ubc scan .
+ubc scan packages/ui --json
+```
+
+`scan` conservatively discovers test files that directly render a relatively imported TSX component, groups all matching tests for that component, and reports project-level Behavior Reach, Behavior Verification, and Verification Gap. Type-only imports, unresolved package imports, and aliased named component imports are intentionally ignored in this phase to avoid false positives.
+
 ## v0.1 supported contract
 
 The first deterministic rule recognizes directly-bound native disabled semantics:
@@ -109,7 +118,7 @@ The project is not affiliated with or endorsed by the paper's authors.
 1. Prove the exercised-vs-verified model on precise native behaviors.
 2. Add richer assertion/data-flow matching.
 3. Add more native behavioral contracts: keyboard activation, checked/selected state, ARIA state coupling, and controlled input behavior.
-4. Add project discovery and Vitest/Jest integration.
+4. Harden project discovery and add framework-native Vitest/Jest integrations.
 5. Evaluate on real open-source component libraries.
 6. Only then consider optional semantic/LLM-assisted contract inference.
 

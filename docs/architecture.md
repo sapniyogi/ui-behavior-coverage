@@ -80,3 +80,18 @@ expect(onSave).toHaveBeenCalledTimes(0);
 ```
 
 These restrictions should be expanded incrementally with false-positive tests for every new inference.
+
+## Project discovery
+
+The `scan` command adds a filesystem discovery layer without broadening behavioral inference. It walks a project while ignoring `.git`, `node_modules`, `dist`, and `coverage`, then inspects `*.test.tsx`, `*.test.ts`, `*.spec.tsx`, and `*.spec.ts` files.
+
+A test file is paired with a component source only when all of the following are true:
+
+1. the test has a relative import that resolves to a `.tsx` source file;
+2. the import is a runtime import, not `import type`;
+3. the imported local identifier is used directly as a JSX tag in that test;
+4. named import aliases are not used.
+
+All matching tests for a component file are combined before behavioral status is selected. This prevents one weak test from hiding a stronger verification test while avoiding duplicate counting of the same component behavior across multiple test files.
+
+Project discovery is deliberately conservative. Package imports, namespace JSX, aliased named imports, JavaScript/JSX files, and framework-specific module-resolution aliases are future work.

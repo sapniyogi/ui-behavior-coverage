@@ -30,3 +30,10 @@ Every new behavior inference rule must include:
 5. a deterministic explanation string.
 
 Run `npm test` before committing.
+
+## Project discovery guardrails
+
+- Project scanning may only pair a test with a component when a runtime relative import resolves to TSX and that imported identifier is rendered directly in JSX.
+- Skip type-only imports, package imports, unresolved files, namespace JSX, and aliased named imports until explicit support and false-positive tests exist.
+- Group all matching tests for one component before calculating its final behavioral status; do not double-count a behavior because multiple test files import the same component.
+- CI must run type-checking, the complete test suite, and npm package dry-run validation.
