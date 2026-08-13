@@ -64,11 +64,13 @@ export function collectTestEnvironment(root: ts.Node): TestEnvironment {
   };
   visit(root);
   for (const declaration of declarations) {
+    if (!ts.isIdentifier(declaration.name)) continue;
+    const name = declaration.name.text;
     if (declaration.initializer && ts.isObjectLiteralExpression(declaration.initializer)) {
-      objects.set(declaration.name.text, declaration.initializer);
+      objects.set(name, declaration.initializer);
     }
     const primitive = primitiveValue(declaration.initializer, values);
-    if (primitive.known) values.set(declaration.name.text, primitive.value);
+    if (primitive.known) values.set(name, primitive.value);
   }
   return { objects, values };
 }

@@ -44,7 +44,6 @@ export type RenderStateBehaviorKind =
   | 'mui-form-controlled-checked-render-state';
 
 export type BehaviorProviderName = 'native-html' | 'material-ui';
-
 export type BehaviorStatus = 'discovered' | 'exercised' | 'verified';
 
 export interface SourceEvidence {
@@ -61,21 +60,9 @@ export type BehaviorCondition = {
 };
 
 export type BehaviorExpectation =
-  | {
-      type: 'callback-not-called';
-      callbackProp: string;
-    }
-  | {
-      type: 'callback-event-boolean';
-      callbackProp: string;
-      path: string[];
-      value: boolean;
-    }
-  | {
-      type: 'callback-event-path';
-      callbackProp: string;
-      path: string[];
-    };
+  | { type: 'callback-not-called'; callbackProp: string }
+  | { type: 'callback-event-boolean'; callbackProp: string; path: string[]; value: boolean }
+  | { type: 'callback-event-path'; callbackProp: string; path: string[] };
 
 export interface BehaviorContract {
   id: string;
@@ -84,34 +71,16 @@ export interface BehaviorContract {
   kind: BehaviorKind;
   title: string;
   condition: BehaviorCondition;
-  event: {
-    handlerProp: string;
-    eventName: string;
-  };
+  event: { handlerProp: string; eventName: string };
   expectation: BehaviorExpectation;
   evidence: SourceEvidence;
 }
 
-export type RenderStateExpectation =
-  | {
-      type: 'element-boolean-state';
-      state: 'disabled' | 'checked';
-      value: boolean;
-    }
-  | {
-      type: 'element-value-state';
-      state: 'value';
-      valueSource: 'condition';
-    }
-  | {
-      type: 'element-visibility-state';
-      visible: boolean;
-    }
-  | {
-      type: 'element-attribute-state';
-      attribute: string;
-      valueSource: 'condition';
-    }
+type RenderStateExpectationCore =
+  | { type: 'element-boolean-state'; state: 'disabled' | 'checked'; value: boolean }
+  | { type: 'element-value-state'; state: 'value'; valueSource: 'condition' }
+  | { type: 'element-visibility-state'; visible: boolean }
+  | { type: 'element-attribute-state'; attribute: string; valueSource: 'condition' }
   | {
       type: 'form-controlled-state';
       state: 'value' | 'checked';
@@ -120,9 +89,14 @@ export type RenderStateExpectation =
     };
 
 /**
- * Historical name retained for API compatibility. Phase 7 expands this contract
- * beyond boolean render state into semantic DOM/accessibility/form evidence.
+ * The optional compatibility fields keep older render-state providers source-compatible
+ * while semantic expectation variants are discriminated by `type`.
  */
+export type RenderStateExpectation = RenderStateExpectationCore & {
+  state?: 'disabled' | 'checked' | 'value';
+  value?: boolean;
+};
+
 export interface RenderStateBehaviorContract {
   id: string;
   componentName: string;
@@ -130,9 +104,7 @@ export interface RenderStateBehaviorContract {
   kind: RenderStateBehaviorKind;
   title: string;
   condition: BehaviorCondition;
-  event: {
-    eventName: 'render';
-  };
+  event: { eventName: 'render' };
   expectation: RenderStateExpectation;
   evidence: SourceEvidence;
 }
@@ -198,10 +170,7 @@ export type DesignValue =
       /** Informational only. MUI's default theme uses 4px, but applications may override it. */
       defaultThemePixels: number;
     }
-  | {
-      kind: 'css-literal';
-      value: string;
-    };
+  | { kind: 'css-literal'; value: string };
 
 export interface DesignObservation {
   id: string;
