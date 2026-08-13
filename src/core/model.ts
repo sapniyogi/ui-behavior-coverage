@@ -54,6 +54,10 @@ export type BehaviorExpectation =
       type: 'element-boolean-state';
       state: 'disabled' | 'checked';
       value: boolean;
+      /** Internal composition carrier; render-state analysis does not treat this as a callback. */
+      callbackProp: string;
+      /** Internal compatibility field for generic expectation composition. */
+      path: string[];
     };
 
 export interface BehaviorContract {
