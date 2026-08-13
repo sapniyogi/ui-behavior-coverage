@@ -39,6 +39,21 @@ export type {
 } from './project/discover';
 export { analyzeProject } from './project/analyze-project';
 export type { AnalyzeProjectOptions } from './project/analyze-project';
+export { resolveProjectComponentBehaviors } from './project/compose-project-behaviors';
+export type {
+  ResolveProjectComponentBehaviorsInput,
+  ResolveProjectComponentBehaviorsOptions,
+} from './project/compose-project-behaviors';
+export {
+  parseProjectSourceFile,
+  readProjectCompilerOptions,
+  resolveProjectModuleFile,
+  traceProjectExport,
+} from './project/module-resolver';
+export type {
+  ProjectModuleResolverOptions,
+  ResolvedProjectExport,
+} from './project/module-resolver';
 export { nativeHtmlBehaviorProvider } from './providers/native-html';
 export { materialUiCompositionProvider } from './providers/material-ui-composition';
 export {
