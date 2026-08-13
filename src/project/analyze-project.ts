@@ -4,8 +4,8 @@ import type { AnalysisReport, ProjectAnalysisReport } from '../core/model';
 import { calculateScores } from '../core/scoring';
 import { extractDirectMaterialUiTestBehaviors } from '../providers/material-ui';
 import { analyzeTestsAgainstBehaviors } from '../react/analyze-tests';
-import { extractComponentBehaviors } from '../react/extract-component-behaviors';
 import { normalizeTestHarnessSource } from '../react/normalize-test-harness';
+import { resolveProjectComponentBehaviors } from './compose-project-behaviors';
 import { discoverProject, discoverTestFiles, type ProjectDiscoveryOptions } from './discover';
 
 function relativePath(rootDir: string, file: string): string {
@@ -15,6 +15,8 @@ function relativePath(rootDir: string, file: string): string {
 export interface AnalyzeProjectOptions extends ProjectDiscoveryOptions {
   /** Additional project-specific render helper names that should behave like Testing Library render(). */
   renderHelpers?: readonly string[];
+  /** Safety bound for recursive local component composition. */
+  maxCompositionDepth?: number;
 }
 
 export function analyzeProject(
@@ -31,7 +33,6 @@ export function analyzeProject(
 
     const componentFile = relativePath(root, target.componentFile);
     const testFiles = target.testFiles.map((file) => relativePath(root, file));
-    const componentSource = readFileSync(target.componentFile, 'utf8');
     const rawTestSource = target.testFiles
       .map((file) => `\n// ---- ${relativePath(root, file)} ----\n${readFileSync(file, 'utf8')}`)
       .join('\n');
@@ -39,9 +40,15 @@ export function analyzeProject(
       renderHelpers: options.renderHelpers,
     });
 
-    const behaviors = extractComponentBehaviors(componentSource, componentFile).filter((behavior) =>
-      target.componentNames.includes(behavior.componentName),
-    );
+    const behaviors = resolveProjectComponentBehaviors({
+      rootDir: root,
+      componentFile: target.componentFile,
+      componentNames: target.componentNames,
+      options: {
+        tsconfigPath: options.tsconfigPath,
+        maxDepth: options.maxCompositionDepth,
+      },
+    });
     const results = analyzeTestsAgainstBehaviors(testSource, behaviors, testFiles.join(', '));
 
     reports.push({
