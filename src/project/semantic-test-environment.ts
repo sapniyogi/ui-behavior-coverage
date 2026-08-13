@@ -49,9 +49,41 @@ export function primitiveValue(
   return unknown;
 }
 
-export function collectTestEnvironment(root: ts.Node): TestEnvironment {
-  const objects = new Map<string, ts.ObjectLiteralExpression>();
-  const values = new Map<string, SemanticPrimitive>();
+function cloneEnvironment(seed?: TestEnvironment): TestEnvironment {
+  return {
+    objects: new Map(seed?.objects ?? []),
+    values: new Map(seed?.values ?? []),
+  };
+}
+
+function applyVariableDeclaration(
+  declaration: ts.VariableDeclaration,
+  env: TestEnvironment,
+): void {
+  if (!ts.isIdentifier(declaration.name)) return;
+  const name = declaration.name.text;
+  if (declaration.initializer && ts.isObjectLiteralExpression(declaration.initializer)) {
+    env.objects.set(name, declaration.initializer);
+  }
+  const primitive = primitiveValue(declaration.initializer, env.values);
+  if (primitive.known) env.values.set(name, primitive.value);
+}
+
+function applyVariableStatement(
+  statement: ts.VariableStatement,
+  env: TestEnvironment,
+): void {
+  if ((statement.declarationList.flags & ts.NodeFlags.Const) !== ts.NodeFlags.Const) return;
+  for (const declaration of statement.declarationList.declarations) {
+    applyVariableDeclaration(declaration, env);
+  }
+}
+
+export function collectTestEnvironment(
+  root: ts.Node,
+  seed?: TestEnvironment,
+): TestEnvironment {
+  const env = cloneEnvironment(seed);
   const declarations: ts.VariableDeclaration[] = [];
   const visit = (node: ts.Node): void => {
     if (
@@ -63,16 +95,44 @@ export function collectTestEnvironment(root: ts.Node): TestEnvironment {
     ts.forEachChild(node, visit);
   };
   visit(root);
-  for (const declaration of declarations) {
-    if (!ts.isIdentifier(declaration.name)) continue;
-    const name = declaration.name.text;
-    if (declaration.initializer && ts.isObjectLiteralExpression(declaration.initializer)) {
-      objects.set(name, declaration.initializer);
+  for (const declaration of declarations) applyVariableDeclaration(declaration, env);
+  return env;
+}
+
+function containingStatement(node: ts.Node, container: ts.Block | ts.SourceFile): ts.Statement | undefined {
+  let current: ts.Node | undefined = node;
+  while (current && current.parent !== container) current = current.parent;
+  return current && ts.isStatement(current) ? current : undefined;
+}
+
+/**
+ * Collects only constants that are lexically visible to a test call.
+ * This captures top-level and describe-block fixtures such as `defaultProps`
+ * without leaking constants from sibling tests into one another.
+ */
+export function collectLexicalTestEnvironment(testCall: ts.CallExpression): TestEnvironment {
+  const containers: Array<{ container: ts.Block | ts.SourceFile; child: ts.Node }> = [];
+  let child: ts.Node = testCall;
+  let parent: ts.Node | undefined = testCall.parent;
+
+  while (parent) {
+    if (ts.isBlock(parent) || ts.isSourceFile(parent)) {
+      containers.push({ container: parent, child });
     }
-    const primitive = primitiveValue(declaration.initializer, values);
-    if (primitive.known) values.set(name, primitive.value);
+    child = parent;
+    parent = parent.parent;
   }
-  return { objects, values };
+
+  containers.reverse();
+  const env = cloneEnvironment();
+  for (const { container, child: nestedChild } of containers) {
+    const boundary = containingStatement(nestedChild, container);
+    for (const statement of container.statements) {
+      if (boundary && statement === boundary) break;
+      if (ts.isVariableStatement(statement)) applyVariableStatement(statement, env);
+    }
+  }
+  return env;
 }
 
 function propertyName(name: ts.PropertyName): string | undefined {
@@ -216,8 +276,9 @@ function conditionMatches(value: ResolvedValue, expected: boolean | 'bound'): bo
 export function findRenderEvidence(
   testBody: ts.Node,
   behavior: RenderStateBehaviorContract,
+  seed?: TestEnvironment,
 ): RenderEvidence | undefined {
-  const env = collectTestEnvironment(testBody);
+  const env = collectTestEnvironment(testBody, seed);
   let result: RenderEvidence | undefined;
   const visit = (node: ts.Node): void => {
     if (result) return;
