@@ -26,7 +26,7 @@ const consumerRoot = mkdtempSync(join(tmpdir(), 'ui-behavior-coverage-consumer-'
 
 try {
   run('npm', ['init', '-y'], consumerRoot);
-  run('npm', ['install', tarball, '--offline', '--no-audit', '--no-fund'], consumerRoot);
+  run('npm', ['install', tarball, '--no-audit', '--no-fund'], consumerRoot);
 
   const fixtureRoot = join(consumerRoot, 'fixture');
   mkdirSync(fixtureRoot, { recursive: true });
