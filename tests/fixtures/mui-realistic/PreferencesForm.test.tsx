@@ -9,6 +9,13 @@ test('enables notifications and verifies the next checked state', async () => {
   );
 });
 
+test('disables notifications but only checks that a callback fired', async () => {
+  const onChange = vi.fn();
+  render(<PreferencesForm enabled onEnabledChange={onChange} />);
+  await user.click(screen.getByRole('checkbox'));
+  expect(onChange).toHaveBeenCalled();
+});
+
 test('selects the email radio option', async () => {
   const onChange = vi.fn();
   render(<PreferencesForm emailSelected={false} onEmailSelect={onChange} />);
