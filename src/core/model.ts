@@ -9,7 +9,15 @@ export type BehaviorKind =
   | 'mui-radio-disabled-change-suppression'
   | 'mui-radio-checked-select'
   | 'mui-text-field-value-change'
-  | 'mui-select-native-value-change';
+  | 'mui-select-native-value-change'
+  | 'mui-button-disabled-render-state'
+  | 'mui-button-loading-render-state'
+  | 'mui-checkbox-disabled-render-state'
+  | 'mui-checkbox-checked-render-state'
+  | 'mui-switch-disabled-render-state'
+  | 'mui-switch-checked-render-state'
+  | 'mui-radio-disabled-render-state'
+  | 'mui-radio-checked-render-state';
 
 export type BehaviorProviderName = 'native-html' | 'material-ui';
 
@@ -41,6 +49,11 @@ export type BehaviorExpectation =
       type: 'callback-event-path';
       callbackProp: string;
       path: string[];
+    }
+  | {
+      type: 'element-boolean-state';
+      state: 'disabled' | 'checked';
+      value: boolean;
     };
 
 export interface BehaviorContract {
