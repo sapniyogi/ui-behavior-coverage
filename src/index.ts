@@ -21,6 +21,13 @@ export type {
 } from './core/model';
 export { calculateScores } from './core/scoring';
 export { formatProjectTextReport, formatTextReport } from './core/reporter';
+export {
+  REPORT_SCHEMA_VERSION,
+  TOOL_VERSION,
+  createAnalysisJsonReport,
+  createProjectJsonReport,
+} from './report-schema';
+export type { JsonReportType, VersionedJsonReport } from './report-schema';
 export { extractComponentBehaviors, defaultBehaviorProviders } from './react/extract-component-behaviors';
 export { analyzeTestsAgainstBehaviors } from './react/analyze-tests';
 export {
@@ -54,6 +61,7 @@ export type {
   ResolveProjectRenderStateOptions,
 } from './project/compose-render-state-behaviors';
 export { extractMaterialUiRenderStateBehaviors } from './project/material-ui-render-state';
+export { extractMaterialUiSemanticBehaviors } from './project/material-ui-semantic-state';
 export {
   parseProjectSourceFile,
   readProjectCompilerOptions,
