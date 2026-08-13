@@ -34,6 +34,47 @@ test('extracts public disabled state from logical MUI expressions', () => {
   }
 });
 
+test('traces useThemeProps destructuring back to public disabled/readOnly props', () => {
+  const root = mkdtempSync(join(tmpdir(), 'uibc-theme-props-'));
+  try {
+    mkdirSync(join(root, 'src'), { recursive: true });
+    const file = join(root, 'src', 'BooleanInput.tsx');
+    writeFileSync(file, `
+      import Switch from '@mui/material/Switch';
+      import { useThemeProps } from '@mui/material/styles';
+      export const BooleanInput = (props: any) => {
+        const { disabled, readOnly, options = {}, ...rest } = useThemeProps({
+          props,
+          name: 'RaBooleanInput',
+        });
+        return (
+          <Switch
+            {...rest}
+            {...options}
+            disabled={disabled || readOnly}
+            readOnly={readOnly}
+          />
+        );
+      };
+    `);
+
+    const behaviors = resolveProjectRenderStateBehaviors({
+      rootDir: root,
+      componentFile: file,
+      componentNames: ['BooleanInput'],
+    });
+    const disabled = behaviors.filter((behavior) =>
+      behavior.kind === 'mui-switch-disabled-render-state'
+    );
+    assert.deepEqual(
+      disabled.map((behavior) => [behavior.condition.prop, behavior.condition.value]).sort(),
+      [['disabled', true], ['readOnly', true]],
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('verifies checked render state through a Testing Library DOM assertion', () => {
   const root = mkdtempSync(join(tmpdir(), 'uibc-render-verify-'));
   try {
