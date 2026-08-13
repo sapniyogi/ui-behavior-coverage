@@ -2,6 +2,7 @@ declare const process: {
   argv: string[];
   execPath: string;
   exitCode?: number;
+  env: Record<string, string | undefined>;
   stdout: { write(message: string): void };
   stderr: { write(message: string): void };
 };
@@ -44,7 +45,7 @@ declare module 'node:child_process' {
   export function spawnSync(
     command: string,
     args: string[],
-    options: { encoding: 'utf8' },
+    options: { encoding: 'utf8'; cwd?: string; env?: Record<string, string | undefined> },
   ): SpawnSyncResult;
 }
 
