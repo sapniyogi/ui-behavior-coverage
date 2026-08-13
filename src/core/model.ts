@@ -83,12 +83,29 @@ export interface AnalysisReport {
   scores: CoverageScores;
 }
 
+export type DiscoverySkipReason =
+  | 'no-runtime-jsx'
+  | 'no-rendered-component-import'
+  | 'external-module'
+  | 'unresolved-module'
+  | 'unresolved-barrel-export';
+
+export interface ProjectDiscoveryTelemetry {
+  totalTestFiles: number;
+  testFilesWithRuntimeJsx: number;
+  testFilesWithTargets: number;
+  importsExamined: number;
+  importsResolved: number;
+  skipped: Record<DiscoverySkipReason, number>;
+}
+
 export interface ProjectAnalysisReport {
   rootDir: string;
   componentsAnalyzed: number;
   testFilesAnalyzed: number;
   reports: AnalysisReport[];
   scores: CoverageScores;
+  discovery?: ProjectDiscoveryTelemetry;
 }
 
 export type DesignObservationKind = 'mui-box-border-radius';
