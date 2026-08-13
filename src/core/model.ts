@@ -19,7 +19,29 @@ export type RenderStateBehaviorKind =
   | 'mui-switch-disabled-render-state'
   | 'mui-switch-checked-render-state'
   | 'mui-radio-disabled-render-state'
-  | 'mui-radio-checked-render-state';
+  | 'mui-radio-checked-render-state'
+  | 'mui-text-field-value-render-state'
+  | 'mui-input-value-render-state'
+  | 'mui-input-base-value-render-state'
+  | 'mui-outlined-input-value-render-state'
+  | 'mui-filled-input-value-render-state'
+  | 'mui-select-value-render-state'
+  | 'mui-slider-value-render-state'
+  | 'mui-dialog-visibility-render-state'
+  | 'mui-drawer-visibility-render-state'
+  | 'mui-popover-visibility-render-state'
+  | 'mui-menu-visibility-render-state'
+  | 'mui-modal-visibility-render-state'
+  | 'mui-collapse-visibility-render-state'
+  | 'mui-fade-visibility-render-state'
+  | 'mui-grow-visibility-render-state'
+  | 'mui-slide-visibility-render-state'
+  | 'mui-zoom-visibility-render-state'
+  | 'mui-accordion-expanded-render-state'
+  | 'mui-toggle-button-selected-render-state'
+  | 'mui-accessibility-attribute-render-state'
+  | 'mui-form-controlled-value-render-state'
+  | 'mui-form-controlled-checked-render-state';
 
 export type BehaviorProviderName = 'native-html' | 'material-ui';
 
@@ -30,6 +52,8 @@ export interface SourceEvidence {
   line: number;
   snippet: string;
 }
+
+export type SemanticPrimitive = string | number | boolean;
 
 export type BehaviorCondition = {
   prop: string;
@@ -68,6 +92,37 @@ export interface BehaviorContract {
   evidence: SourceEvidence;
 }
 
+export type RenderStateExpectation =
+  | {
+      type: 'element-boolean-state';
+      state: 'disabled' | 'checked';
+      value: boolean;
+    }
+  | {
+      type: 'element-value-state';
+      state: 'value';
+      valueSource: 'condition';
+    }
+  | {
+      type: 'element-visibility-state';
+      visible: boolean;
+    }
+  | {
+      type: 'element-attribute-state';
+      attribute: string;
+      valueSource: 'condition';
+    }
+  | {
+      type: 'form-controlled-state';
+      state: 'value' | 'checked';
+      fieldKeyProp: 'source' | 'name';
+      containers: readonly ('defaultValues' | 'record' | 'values')[];
+    };
+
+/**
+ * Historical name retained for API compatibility. Phase 7 expands this contract
+ * beyond boolean render state into semantic DOM/accessibility/form evidence.
+ */
 export interface RenderStateBehaviorContract {
   id: string;
   componentName: string;
@@ -78,11 +133,7 @@ export interface RenderStateBehaviorContract {
   event: {
     eventName: 'render';
   };
-  expectation: {
-    type: 'element-boolean-state';
-    state: 'disabled' | 'checked';
-    value: boolean;
-  };
+  expectation: RenderStateExpectation;
   evidence: SourceEvidence;
 }
 
