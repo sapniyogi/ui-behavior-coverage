@@ -564,6 +564,8 @@ function inferMuiUsage(
 
     if (checked) {
       if (muiComponent === 'Radio') {
+        // Radio selection only applies when the underlying radio is currently unchecked.
+        // If checked is inverted from a public prop, that corresponds to public=true.
         const outerValueWhenUnchecked = checked.inverted;
         pushBooleanState(
           behaviors,
@@ -578,28 +580,23 @@ function inferMuiUsage(
         );
       } else {
         const kind = muiComponent === 'Checkbox' ? 'mui-checkbox-checked-toggle' : 'mui-switch-checked-toggle';
-        pushBooleanState(
-          behaviors,
-          sourceFile,
-          node,
-          context.name,
-          kind,
-          checked.prop,
-          checked.inverted,
-          callbackProp,
-          false,
-        );
-        pushBooleanState(
-          behaviors,
-          sourceFile,
-          node,
-          context.name,
-          kind,
-          checked.prop,
-          !checked.inverted,
-          callbackProp,
-          true,
-        );
+        // The callback reports the next *underlying MUI checked state*.
+        // Non-inverted: outer=false -> true, outer=true -> false.
+        // Inverted:     outer=false -> false, outer=true -> true.
+        for (const outerValue of [false, true] as const) {
+          const nextChecked = checked.inverted ? outerValue : !outerValue;
+          pushBooleanState(
+            behaviors,
+            sourceFile,
+            node,
+            context.name,
+            kind,
+            checked.prop,
+            outerValue,
+            callbackProp,
+            nextChecked,
+          );
+        }
       }
     }
   }
