@@ -34,12 +34,13 @@
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "npm run clean && tsc -p tsconfig.json",
     "check": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && node --test dist/tests/*.test.js",
+    "test:unit": "npm run build && node --test dist/tests/*.test.js",
+    "test": "npm run test:unit && npm run consumer:smoke",
     "smoke": "npm run build && node dist/src/cli/index.js analyze --component tests/fixtures/SaveButton.tsx --test tests/fixtures/SaveButton.weak.test.tsx",
     "prepack": "npm run build",
     "pack:check": "npm pack --dry-run",
     "consumer:smoke": "node scripts/consumer-smoke.mjs",
-    "release:check": "npm run check && npm test && npm run pack:check && npm run consumer:smoke",
+    "release:check": "npm run check && npm test && npm run pack:check",
     "ci": "npm run check && npm test && npm run pack:check"
   },
   "dependencies": {
