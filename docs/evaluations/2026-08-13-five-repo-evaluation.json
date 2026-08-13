@@ -1,0 +1,47 @@
+[
+  {
+    "repository": "clash-verge-rev/clash-verge-rev",
+    "scope": "src",
+    "upstreamSha": "aadceba0642b8f58cf7c6e426ff29bf6846cbfe1",
+    "inventory": { "testFiles": 8, "tsxFiles": 124, "muiImportFiles": 108 },
+    "componentsAnalyzed": 1,
+    "testFilesAnalyzed": 1,
+    "scores": { "discovered": 0, "exercised": 0, "verified": 0, "behaviorReach": 0, "behaviorVerification": 0, "verificationGap": 0 }
+  },
+  {
+    "repository": "marmelab/react-admin",
+    "scope": "packages/ra-ui-materialui",
+    "upstreamSha": "051f511bb0afb5ea565c2d3728bf4dab0a6fa5e0",
+    "inventory": { "testFiles": 118, "tsxFiles": 487, "muiImportFiles": 332 },
+    "componentsAnalyzed": 80,
+    "testFilesAnalyzed": 78,
+    "scores": { "discovered": 0, "exercised": 0, "verified": 0, "behaviorReach": 0, "behaviorVerification": 0, "verificationGap": 0 }
+  },
+  {
+    "repository": "mui/mui-x",
+    "scope": "packages/x-data-grid",
+    "upstreamSha": "17580d3dfe835b4d4b1290f50c4d95ed7b74de21",
+    "inventory": { "testFiles": 45, "tsxFiles": 180, "muiImportFiles": 49 },
+    "componentsAnalyzed": 1,
+    "testFilesAnalyzed": 1,
+    "scores": { "discovered": 0, "exercised": 0, "verified": 0, "behaviorReach": 0, "behaviorVerification": 0, "verificationGap": 0 }
+  },
+  {
+    "repository": "mui/toolpad",
+    "scope": "packages/toolpad-core",
+    "upstreamSha": "b2a4a69f343e98e6f3f7ebeba47dbc609c542e37",
+    "inventory": { "testFiles": 19, "tsxFiles": 95, "muiImportFiles": 31 },
+    "componentsAnalyzed": 13,
+    "testFilesAnalyzed": 16,
+    "scores": { "discovered": 0, "exercised": 0, "verified": 0, "behaviorReach": 0, "behaviorVerification": 0, "verificationGap": 0 }
+  },
+  {
+    "repository": "OpenCTI-Platform/opencti",
+    "scope": "opencti-platform/opencti-front",
+    "upstreamSha": "2dfbddd21c3316bfcd1b3d7e1a35358feb9e6223",
+    "inventory": { "testFiles": 190, "tsxFiles": 1865, "muiImportFiles": 1133 },
+    "componentsAnalyzed": 53,
+    "testFilesAnalyzed": 51,
+    "scores": { "discovered": 0, "exercised": 0, "verified": 0, "behaviorReach": 0, "behaviorVerification": 0, "verificationGap": 0 }
+  }
+]
