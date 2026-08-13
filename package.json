@@ -38,7 +38,9 @@
     "behavioral-testing",
     "testing-library",
     "vitest",
-    "jest"
+    "jest",
+    "material-ui",
+    "mui"
   ],
   "repository": {
     "type": "git",
