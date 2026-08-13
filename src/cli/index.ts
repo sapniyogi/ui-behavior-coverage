@@ -119,7 +119,7 @@ function main(): void {
     }
     const report = analyzeProject(options.root ?? '.');
     if (options.json) {
-      process.stdout.write(`${JSON.stringify(createProjectJsonReport(report), null, 2)}\n`);
+      process.stdout.write(`${JSON.stringify({ ...report, ...createProjectJsonReport(report) }, null, 2)}\n`);
     } else {
       process.stdout.write(`${formatProjectTextReport(report)}\n`);
     }
@@ -141,7 +141,7 @@ function main(): void {
   });
 
   if (options.json) {
-    process.stdout.write(`${JSON.stringify(createAnalysisJsonReport(report), null, 2)}\n`);
+    process.stdout.write(`${JSON.stringify({ ...report, ...createAnalysisJsonReport(report) }, null, 2)}\n`);
   } else {
     process.stdout.write(`${formatTextReport(report)}\n`);
   }
