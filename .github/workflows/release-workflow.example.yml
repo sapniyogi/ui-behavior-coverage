@@ -1,5 +1,3 @@
-# Reference only. Review and copy to .github/workflows/publish.yml after configuring
-# npm Trusted Publishing for the exact workflow filename.
 name: Publish package
 
 on:
@@ -24,4 +22,20 @@ jobs:
       - run: npm ci
       - run: node scripts/verify-release-tag.mjs
       - run: npm run release:check
-      - run: npm publish --access public
+      - name: Check whether package version already exists
+        id: registry
+        shell: bash
+        run: |
+          NAME="$(node -p "require('./package.json').name")"
+          VERSION="$(node -p "require('./package.json').version")"
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Publish package
+        if: steps.registry.outputs.exists != 'true'
+        run: npm publish --access public --tag alpha
+      - name: Version already published
+        if: steps.registry.outputs.exists == 'true'
+        run: echo "Package version already exists on npm; skipping duplicate publish."
