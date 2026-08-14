@@ -17,7 +17,7 @@ npm publish --dry-run --tag alpha
 
 `npm test` includes the packed-consumer smoke test: it creates a tarball, installs that artifact into a temporary npm project, invokes the installed CLI, scans a fixture, and verifies CommonJS and ESM loading.
 
-The release tag must exactly match `v${package.json.version}`. Alpha builds are published under the npm `alpha` dist-tag rather than `latest`.
+The release tag must exactly match `v${package.json.version}`. Alpha builds are published under the npm `alpha` dist-tag. The npm registry also requires package metadata to contain a `latest` dist-tag; for a package whose only published version is the first alpha, `latest` can point to that same alpha even though publication used `--tag alpha`. Do not try to delete `latest`; move it to the first stable release when one exists.
 
 ## First-publication bootstrap
 
@@ -33,7 +33,7 @@ After Trusted Publishing is configured, push `v0.1.0-alpha.0`. The workflow will
 
 For later alpha versions, update `package.json`, merge the release change to `main`, and push the matching `v*` tag. The workflow publishes new versions under the `alpha` dist-tag.
 
-Reserve `latest` for a stable release unless the release policy changes explicitly.
+Reserve `latest` for a stable release once a stable version exists. Until then, the registry may keep `latest` pointing at the only published alpha version.
 
 ## Release checklist
 
@@ -49,6 +49,7 @@ Reserve `latest` for a stable release unless the release policy changes explicit
 - precision audit has zero known false VERIFIED classifications.
 - changelog entry exists.
 - first publication is verified in the npm registry.
+- `alpha` points to the prerelease; if `latest` also points to the first alpha because no stable version exists yet, leave it in place and move it when the first stable version is published.
 - Trusted Publishing is configured for the exact workflow filename before automated future publishes.
 - git tag matches `package.json` version.
 - npm package page/repository metadata point to this repository.
