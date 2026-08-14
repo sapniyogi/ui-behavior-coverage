@@ -11,7 +11,7 @@ Traditional code coverage asks **“did this code execute?”** `ui-behavior-cov
 ## Install and scan
 
 ```bash
-npm install -D ui-behavior-coverage
+npm install -D ui-behavior-coverage@alpha
 npx ui-behavior-coverage scan .
 ```
 
