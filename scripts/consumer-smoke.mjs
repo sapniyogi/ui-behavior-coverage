@@ -5,12 +5,19 @@ import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const repoRoot = process.cwd();
+const npmExecPath = process.env.npm_execpath;
+
+assert.ok(
+  npmExecPath,
+  'consumer smoke must be invoked from an npm lifecycle script so npm_execpath is available',
+);
 
 function run(command, args, cwd = repoRoot) {
   const result = spawnSync(command, args, { cwd, encoding: 'utf8' });
-  if (result.status !== 0) {
+  if (result.error || result.status !== 0) {
     throw new Error([
-      `Command failed (${result.status}): ${command} ${args.join(' ')}`,
+      `Command failed (${result.status ?? 'spawn-error'}): ${command} ${args.join(' ')}`,
+      result.error?.stack ?? result.error?.message,
       result.stdout,
       result.stderr,
     ].filter(Boolean).join('\n'));
@@ -18,15 +25,19 @@ function run(command, args, cwd = repoRoot) {
   return result.stdout;
 }
 
-const packOutput = run('npm', ['pack', '--json']);
+function runNpm(args, cwd = repoRoot) {
+  return run(process.execPath, [npmExecPath, ...args], cwd);
+}
+
+const packOutput = runNpm(['pack', '--json']);
 const packed = JSON.parse(packOutput);
 assert.ok(Array.isArray(packed) && packed.length === 1, 'npm pack must return one tarball');
 const tarball = resolve(repoRoot, packed[0].filename);
 const consumerRoot = mkdtempSync(join(tmpdir(), 'ui-behavior-coverage-consumer-'));
 
 try {
-  run('npm', ['init', '-y'], consumerRoot);
-  run('npm', ['install', tarball, '--no-audit', '--no-fund'], consumerRoot);
+  runNpm(['init', '-y'], consumerRoot);
+  runNpm(['install', tarball, '--no-audit', '--no-fund'], consumerRoot);
 
   const fixtureRoot = join(consumerRoot, 'fixture');
   mkdirSync(fixtureRoot, { recursive: true });
@@ -48,16 +59,21 @@ try {
     });
   `);
 
-  const version = run('npx', ['--no-install', 'ui-behavior-coverage', '--version'], consumerRoot).trim();
+  const version = runNpm(
+    ['exec', '--', 'ui-behavior-coverage', '--version'],
+    consumerRoot,
+  ).trim();
   assert.equal(version, '0.1.0-alpha.0');
 
-  const help = run('npx', ['--no-install', 'ui-behavior-coverage', '--help'], consumerRoot);
+  const help = runNpm(
+    ['exec', '--', 'ui-behavior-coverage', '--help'],
+    consumerRoot,
+  );
   assert.match(help, /ubc scan/);
   assert.match(help, /schemaVersion/);
 
-  const scanOutput = run(
-    'npx',
-    ['--no-install', 'ui-behavior-coverage', 'scan', 'fixture', '--json'],
+  const scanOutput = runNpm(
+    ['exec', '--', 'ui-behavior-coverage', 'scan', 'fixture', '--json'],
     consumerRoot,
   );
   const scan = JSON.parse(scanOutput);
