@@ -29,7 +29,7 @@ export {
 } from './report-schema';
 export type { JsonReportType, VersionedJsonReport } from './report-schema';
 export { extractComponentBehaviors, defaultBehaviorProviders } from './react/extract-component-behaviors';
-export { analyzeTestsAgainstBehaviors } from './react/analyze-tests';
+export { analyzeTestsAgainstBehaviors } from './react/analyze-tests-target-aware';
 export {
   defaultRenderHelpers,
   normalizeTestHarnessSource,
