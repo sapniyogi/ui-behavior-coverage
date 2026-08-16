@@ -3,7 +3,7 @@ import { relative, resolve } from 'node:path';
 import type { AnalysisReport, ProjectAnalysisReport } from '../core/model';
 import { calculateScores } from '../core/scoring';
 import { extractDirectMaterialUiTestBehaviors } from '../providers/material-ui';
-import { analyzeTestsAgainstBehaviors } from '../react/analyze-tests';
+import { analyzeTestsAgainstBehaviors } from '../react/analyze-tests-target-aware';
 import { normalizeTestHarnessSource } from '../react/normalize-test-harness';
 import { analyzeRenderStateTests } from './analyze-render-state-tests';
 import { resolveProjectComponentBehaviors } from './compose-project-behaviors';
