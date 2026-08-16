@@ -38,6 +38,11 @@ interface ResolvedExport {
   componentName: string;
 }
 
+interface PackageSelfReference {
+  name: string;
+  exports?: unknown;
+}
+
 function createSkipped(): Record<DiscoverySkipReason, number> {
   return {
     'no-runtime-jsx': 0,
@@ -154,6 +159,19 @@ function readCompilerOptions(rootDir: string, options: ProjectDiscoveryOptions):
   };
 }
 
+function readPackageSelfReference(rootDir: string): PackageSelfReference | undefined {
+  const packageJson = join(rootDir, 'package.json');
+  if (!existsSync(packageJson)) return undefined;
+
+  try {
+    const parsed = JSON.parse(readFileSync(packageJson, 'utf8')) as { name?: unknown; exports?: unknown };
+    if (typeof parsed.name !== 'string' || parsed.name.length === 0) return undefined;
+    return { name: parsed.name, exports: parsed.exports };
+  } catch {
+    return undefined;
+  }
+}
+
 function isSourceFile(file: string): boolean {
   return sourceExtensions.some((extension) => file.endsWith(extension));
 }
@@ -163,14 +181,18 @@ function isInsideRoot(file: string, rootDir: string): boolean {
   return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
 }
 
-function fallbackRelativeResolution(fromFile: string, specifier: string): string | undefined {
-  if (!specifier.startsWith('.')) return undefined;
-  const base = resolve(dirname(fromFile), specifier);
-  const candidates = extname(base)
-    ? [base]
+function existingSourceCandidate(base: string): string | undefined {
+  const extension = extname(base);
+  const candidates = extension
+    ? [
+        base,
+        ...(extension === '.js' || extension === '.jsx'
+          ? sourceExtensions.map((sourceExtension) => `${base.slice(0, -extension.length)}${sourceExtension}`)
+          : []),
+      ]
     : [
-        ...sourceExtensions.map((extension) => `${base}${extension}`),
-        ...sourceExtensions.map((extension) => join(base, `index${extension}`)),
+        ...sourceExtensions.map((sourceExtension) => `${base}${sourceExtension}`),
+        ...sourceExtensions.map((sourceExtension) => join(base, `index${sourceExtension}`)),
       ];
 
   return candidates.find((candidate) =>
@@ -178,12 +200,104 @@ function fallbackRelativeResolution(fromFile: string, specifier: string): string
   );
 }
 
+function fallbackRelativeResolution(fromFile: string, specifier: string): string | undefined {
+  if (!specifier.startsWith('.')) return undefined;
+  return existingSourceCandidate(resolve(dirname(fromFile), specifier));
+}
+
+function firstStringExportTarget(value: unknown): string | undefined {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const target = firstStringExportTarget(entry);
+      if (target) return target;
+    }
+    return undefined;
+  }
+  if (!value || typeof value !== 'object') return undefined;
+
+  const record = value as Record<string, unknown>;
+  for (const key of ['source', 'import', 'default', 'browser', 'node', 'require']) {
+    if (!(key in record)) continue;
+    const target = firstStringExportTarget(record[key]);
+    if (target) return target;
+  }
+  for (const candidate of Object.values(record)) {
+    const target = firstStringExportTarget(candidate);
+    if (target) return target;
+  }
+  return undefined;
+}
+
+function packageExportTarget(exportsField: unknown, subpath: string): string | undefined {
+  const requested = subpath ? `./${subpath}` : '.';
+  if (typeof exportsField === 'string' || Array.isArray(exportsField)) {
+    return requested === '.' ? firstStringExportTarget(exportsField) : undefined;
+  }
+  if (!exportsField || typeof exportsField !== 'object') return undefined;
+
+  const exportsRecord = exportsField as Record<string, unknown>;
+  if (requested in exportsRecord) return firstStringExportTarget(exportsRecord[requested]);
+
+  const wildcardEntries = Object.entries(exportsRecord)
+    .filter(([key]) => key.includes('*'))
+    .sort(([left], [right]) => right.length - left.length);
+
+  for (const [key, value] of wildcardEntries) {
+    const starIndex = key.indexOf('*');
+    const prefix = key.slice(0, starIndex);
+    const suffix = key.slice(starIndex + 1);
+    if (!requested.startsWith(prefix) || !requested.endsWith(suffix)) continue;
+
+    const matched = requested.slice(prefix.length, requested.length - suffix.length);
+    const target = firstStringExportTarget(value);
+    if (target) return target.replace('*', matched);
+  }
+
+  return undefined;
+}
+
+function resolvePackageSelfImport(
+  specifier: string,
+  rootDir: string,
+  packageSelfReference: PackageSelfReference | undefined,
+): string | undefined {
+  if (!packageSelfReference) return undefined;
+  if (specifier !== packageSelfReference.name && !specifier.startsWith(`${packageSelfReference.name}/`)) {
+    return undefined;
+  }
+
+  const subpath = specifier === packageSelfReference.name
+    ? ''
+    : specifier.slice(packageSelfReference.name.length + 1);
+  const exportedTarget = packageExportTarget(packageSelfReference.exports, subpath);
+
+  if (exportedTarget?.startsWith('./')) {
+    const candidate = existingSourceCandidate(resolve(rootDir, exportedTarget));
+    if (candidate && isInsideRoot(candidate, rootDir)) return candidate;
+  }
+
+  const fallbackBases = subpath
+    ? [join(rootDir, 'src', subpath), join(rootDir, subpath)]
+    : [join(rootDir, 'src', 'index'), join(rootDir, 'index')];
+
+  for (const base of fallbackBases) {
+    const candidate = existingSourceCandidate(base);
+    if (candidate && isInsideRoot(candidate, rootDir)) return candidate;
+  }
+  return undefined;
+}
+
 function resolveModuleFile(
   fromFile: string,
   specifier: string,
   rootDir: string,
   compilerOptions: ts.CompilerOptions,
+  packageSelfReference: PackageSelfReference | undefined,
 ): { file?: string; external: boolean } {
+  const selfReference = resolvePackageSelfImport(specifier, rootDir, packageSelfReference);
+  if (selfReference) return { file: normalize(selfReference), external: false };
+
   const resolvedModule = ts.resolveModuleName(specifier, fromFile, compilerOptions, ts.sys).resolvedModule;
   let file = resolvedModule?.resolvedFileName;
 
@@ -255,6 +369,7 @@ function traceExport(
   exportName: string | undefined,
   rootDir: string,
   compilerOptions: ts.CompilerOptions,
+  packageSelfReference: PackageSelfReference | undefined,
   visited = new Set<string>(),
 ): ResolvedExport | undefined {
   const visitKey = `${file}::${exportName ?? 'default'}`;
@@ -291,22 +406,42 @@ function traceExport(
           continue;
         }
 
-        const resolved = resolveModuleFile(file, moduleSpecifier, rootDir, compilerOptions);
+        const resolved = resolveModuleFile(
+          file,
+          moduleSpecifier,
+          rootDir,
+          compilerOptions,
+          packageSelfReference,
+        );
         if (!resolved.file) continue;
         return traceExport(
           resolved.file,
           sourceName === 'default' ? undefined : sourceName,
           rootDir,
           compilerOptions,
+          packageSelfReference,
           visited,
         );
       }
     }
 
     if (!statement.exportClause && moduleSpecifier && exportName) {
-      const resolved = resolveModuleFile(file, moduleSpecifier, rootDir, compilerOptions);
+      const resolved = resolveModuleFile(
+        file,
+        moduleSpecifier,
+        rootDir,
+        compilerOptions,
+        packageSelfReference,
+      );
       if (!resolved.file) continue;
-      const traced = traceExport(resolved.file, exportName, rootDir, compilerOptions, visited);
+      const traced = traceExport(
+        resolved.file,
+        exportName,
+        rootDir,
+        compilerOptions,
+        packageSelfReference,
+        visited,
+      );
       if (traced) return traced;
     }
   }
@@ -325,6 +460,7 @@ function importedComponentsUsedInJsx(
   testFile: string,
   rootDir: string,
   compilerOptions: ts.CompilerOptions,
+  packageSelfReference: PackageSelfReference | undefined,
   telemetry: ProjectDiscoveryTelemetry,
 ): ImportedComponentReference[] {
   const sourceFile = parseSourceFile(testFile);
@@ -347,7 +483,13 @@ function importedComponentsUsedInJsx(
       renderedRuntimeImportCount += 1;
       telemetry.importsExamined += 1;
 
-      const resolved = resolveModuleFile(testFile, specifier, rootDir, compilerOptions);
+      const resolved = resolveModuleFile(
+        testFile,
+        specifier,
+        rootDir,
+        compilerOptions,
+        packageSelfReference,
+      );
       if (!resolved.file) {
         telemetry.skipped[resolved.external ? 'external-module' : 'unresolved-module'] += 1;
         continue;
@@ -358,6 +500,7 @@ function importedComponentsUsedInJsx(
         binding.isDefault ? undefined : binding.importedName,
         rootDir,
         compilerOptions,
+        packageSelfReference,
       );
       if (!traced) {
         telemetry.skipped['unresolved-barrel-export'] += 1;
@@ -380,6 +523,7 @@ export function discoverProject(
   const root = resolve(rootDir);
   const testFiles = discoverTestFiles(root);
   const compilerOptions = readCompilerOptions(root, options);
+  const packageSelfReference = readPackageSelfReference(root);
   const telemetry: ProjectDiscoveryTelemetry = {
     totalTestFiles: testFiles.length,
     testFilesWithRuntimeJsx: 0,
@@ -391,7 +535,13 @@ export function discoverProject(
   const targets = new Map<string, { componentNames: Set<string>; testFiles: Set<string> }>();
 
   for (const file of testFiles) {
-    const references = importedComponentsUsedInJsx(file, root, compilerOptions, telemetry);
+    const references = importedComponentsUsedInJsx(
+      file,
+      root,
+      compilerOptions,
+      packageSelfReference,
+      telemetry,
+    );
     if (references.length > 0) telemetry.testFilesWithTargets += 1;
 
     for (const reference of references) {
