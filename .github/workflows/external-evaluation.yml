@@ -102,7 +102,7 @@ jobs:
           ROOT="external/${{ matrix.slug }}/${{ matrix.scope }}"
           TEST_FILES=$(find "$ROOT" -type f \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.test.js' -o -name '*.test.jsx' -o -name '*.spec.ts' -o -name '*.spec.tsx' -o -name '*.spec.js' -o -name '*.spec.jsx' \) | wc -l | tr -d ' ')
           TSX_FILES=$(find "$ROOT" -type f -name '*.tsx' | wc -l | tr -d ' ')
-          MUI_FILES=$((grep -RIl --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' '@mui/material' "$ROOT" 2>/dev/null || true) | wc -l | tr -d ' ')
+          MUI_FILES=$( { grep -RIl --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' '@mui/material' "$ROOT" 2>/dev/null || true; } | wc -l | tr -d ' ')
           printf '{"testFiles":%s,"tsxFiles":%s,"muiImportFiles":%s}\n' "$TEST_FILES" "$TSX_FILES" "$MUI_FILES" > "external/${{ matrix.slug }}-inventory.json"
           cat "external/${{ matrix.slug }}-inventory.json"
       - name: Run ui-behavior-coverage
