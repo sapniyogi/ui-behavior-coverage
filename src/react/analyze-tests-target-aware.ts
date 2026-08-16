@@ -47,43 +47,58 @@ function collectTestCases(sourceFile: ts.SourceFile): ParsedTestCase[] {
   return cases;
 }
 
-function nativeRoleFromEvidence(behavior: BehaviorContract): string | undefined {
+function nativeRolesFromEvidence(behavior: BehaviorContract): readonly string[] | undefined {
   const snippet = behavior.evidence.snippet.trim();
-  if (/^<button\b/i.test(snippet)) return 'button';
-  if (/^<textarea\b/i.test(snippet)) return 'textbox';
-  if (/^<select\b/i.test(snippet)) return 'combobox';
-  if (/^<option\b/i.test(snippet)) return 'option';
+  if (/^<button\b/i.test(snippet)) return ['button'];
+  if (/^<textarea\b/i.test(snippet)) return ['textbox'];
+  if (/^<option\b/i.test(snippet)) return ['option'];
+
+  if (/^<select\b/i.test(snippet)) {
+    // `multiple` or `size` can change the implicit role. If either is present,
+    // leave the target unconstrained unless a later rule resolves its value.
+    if (/\bmultiple\b/i.test(snippet) || /\bsize\s*=/i.test(snippet)) return undefined;
+    return ['combobox'];
+  }
+
   if (/^<input\b/i.test(snippet)) {
     const type = snippet.match(/\btype\s*=\s*["']([^"']+)["']/i)?.[1]?.toLowerCase();
-    if (type === 'checkbox') return 'checkbox';
-    if (type === 'radio') return 'radio';
-    if (type === 'button' || type === 'submit' || type === 'reset') return 'button';
-    if (!type || type === 'text' || type === 'email' || type === 'password' || type === 'search' || type === 'tel' || type === 'url') {
-      return 'textbox';
-    }
+    if (type === 'checkbox') return ['checkbox'];
+    if (type === 'radio') return ['radio'];
+    if (type === 'button' || type === 'submit' || type === 'reset' || type === 'image') return ['button'];
+    if (type === 'search') return ['searchbox'];
+    if (type === 'number') return ['spinbutton'];
+    if (type === 'range') return ['slider'];
+    if (!type || type === 'text' || type === 'email' || type === 'tel' || type === 'url') return ['textbox'];
+    // Password/file/hidden and uncommon input modes do not have one sufficiently
+    // stable role for this precision gate, so unknown remains eligible.
   }
   return undefined;
 }
 
-function expectedTargetRole(behavior: BehaviorContract): string | undefined {
+function expectedTargetRoles(behavior: BehaviorContract): readonly string[] | undefined {
   switch (behavior.kind) {
     case 'native-disabled-event-suppression':
-      return nativeRoleFromEvidence(behavior);
+      return nativeRolesFromEvidence(behavior);
     case 'mui-button-disabled-event-suppression':
     case 'mui-button-loading-event-suppression':
-      return 'button';
+      // MUI Button can render an anchor when link props are supplied.
+      return ['button', 'link'];
     case 'mui-checkbox-disabled-change-suppression':
     case 'mui-checkbox-checked-toggle':
     case 'mui-switch-disabled-change-suppression':
     case 'mui-switch-checked-toggle':
-      return 'checkbox';
+      // `checkbox` is the default input role; an explicit ARIA switch role is
+      // also compatible with the same checked-state interaction contract.
+      return ['checkbox', 'switch'];
     case 'mui-radio-disabled-change-suppression':
     case 'mui-radio-checked-select':
-      return 'radio';
+      return ['radio'];
     case 'mui-text-field-value-change':
-      return 'textbox';
+      // TextField may wrap text, search, or number inputs depending on `type`.
+      return ['textbox', 'searchbox', 'spinbutton'];
     case 'mui-select-native-value-change':
-      return 'combobox';
+      // Native Select is normally combobox; multi/size variants may be listbox.
+      return ['combobox', 'listbox'];
   }
 }
 
@@ -192,8 +207,8 @@ function firstMatchingRenderPosition(testBody: ts.Node, behavior: BehaviorContra
 }
 
 function hasTargetCompatibleInteraction(testBody: ts.Node, behavior: BehaviorContract): boolean {
-  const expectedRole = expectedTargetRole(behavior);
-  if (!expectedRole) return true;
+  const expectedRoles = expectedTargetRoles(behavior);
+  if (!expectedRoles) return true;
 
   const bindings = collectRoleBindings(testBody);
   const renderPosition = firstMatchingRenderPosition(testBody, behavior);
@@ -208,7 +223,7 @@ function hasTargetCompatibleInteraction(testBody: ts.Node, behavior: BehaviorCon
       node.getStart() > renderPosition
     ) {
       const knownRole = targetRole(node.arguments[0], bindings);
-      if (!knownRole || knownRole === expectedRole) {
+      if (!knownRole || expectedRoles.includes(knownRole)) {
         compatible = true;
         return;
       }
@@ -224,14 +239,14 @@ function incompatibleTargetResult(
   result: BehaviorResult,
   behavior: BehaviorContract,
 ): BehaviorResult {
-  const role = expectedTargetRole(behavior);
+  const roles = expectedTargetRoles(behavior);
   return {
     behavior,
     status: 'discovered',
     testName: result.testName,
     callbackVariable: result.callbackVariable,
-    reason: role
-      ? `The test renders the behavior, but its ${behavior.event.eventName} interaction targets an explicitly incompatible Testing Library role; expected ${role} when the target role is known.`
+    reason: roles
+      ? `The test renders the behavior, but its ${behavior.event.eventName} interaction targets an explicitly incompatible Testing Library role; expected ${roles.join(' or ')} when the target role is known.`
       : result.reason,
   };
 }
