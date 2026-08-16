@@ -1,7 +1,7 @@
 import type { AnalysisReport } from '../core/model';
 import { calculateScores } from '../core/scoring';
 import { extractComponentBehaviors } from './extract-component-behaviors';
-import { analyzeTestsAgainstBehaviors } from './analyze-tests';
+import { analyzeTestsAgainstBehaviors } from './analyze-tests-target-aware';
 
 export interface AnalyzeReactSourcesInput {
   componentSource: string;
