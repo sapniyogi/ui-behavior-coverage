@@ -1,0 +1,144 @@
+{
+  "evaluationDate": "2026-08-15",
+  "workflowRunId": 31920453970,
+  "analyzerCommit": "d1d157f1f22e151fe65bd651879608e2d28ba3de",
+  "corpus": {
+    "repositories": 11,
+    "testBearingRepositories": 10,
+    "testFilesInventoried": 835,
+    "testFilesPairedOrAnalyzed": 304,
+    "componentsAnalyzed": 308,
+    "discovered": 14,
+    "exercised": 2,
+    "verified": 1
+  },
+  "repositories": [
+    {
+      "repository": "clash-verge-rev/clash-verge-rev",
+      "scope": "src",
+      "upstreamSha": "aadceba0642b8f58cf7c6e426ff29bf6846cbfe1",
+      "testFiles": 8,
+      "testFilesAnalyzed": 1,
+      "discovered": 0,
+      "exercised": 0,
+      "verified": 0
+    },
+    {
+      "repository": "dohomi/react-hook-form-mui",
+      "scope": "packages/rhf-mui",
+      "upstreamSha": "b19c844a3fb39778ece6f4ae19ed5c10b960346e",
+      "testFiles": 0,
+      "testFilesAnalyzed": 0,
+      "discovered": 0,
+      "exercised": 0,
+      "verified": 0,
+      "note": "Retained as an explicit zero-test package-scope benchmark limitation; excluded from test-bearing repository count."
+    },
+    {
+      "repository": "marmelab/react-admin",
+      "scope": "packages/ra-ui-materialui",
+      "upstreamSha": "051f511bb0afb5ea565c2d3728bf4dab0a6fa5e0",
+      "testFiles": 118,
+      "testFilesAnalyzed": 118,
+      "discovered": 4,
+      "exercised": 2,
+      "verified": 1
+    },
+    {
+      "repository": "mui/material-ui",
+      "scope": "packages/mui-material",
+      "upstreamSha": "48c6663a66b7eacbd9c7c411863ab5d18dbeea88",
+      "testFiles": 294,
+      "testFilesAnalyzed": 23,
+      "discovered": 0,
+      "exercised": 0,
+      "verified": 0,
+      "discovery": {
+        "testFilesWithRuntimeJsx": 255,
+        "importsExamined": 509,
+        "importsResolved": 25,
+        "externalModulesSkipped": 484
+      }
+    },
+    {
+      "repository": "mui/mui-x",
+      "scope": "packages/x-data-grid",
+      "upstreamSha": "17580d3dfe835b4d4b1290f50c4d95ed7b74de21",
+      "testFiles": 45,
+      "testFilesAnalyzed": 36,
+      "discovered": 0,
+      "exercised": 0,
+      "verified": 0
+    },
+    {
+      "repository": "mui/toolpad",
+      "scope": "packages/toolpad-core",
+      "upstreamSha": "b2a4a69f343e98e6f3f7ebeba47dbc609c542e37",
+      "testFiles": 19,
+      "testFilesAnalyzed": 16,
+      "discovered": 0,
+      "exercised": 0,
+      "verified": 0
+    },
+    {
+      "repository": "OpenCTI-Platform/opencti",
+      "scope": "opencti-platform/opencti-front",
+      "upstreamSha": "2dfbddd21c3316bfcd1b3d7e1a35358feb9e6223",
+      "testFiles": 191,
+      "testFilesAnalyzed": 55,
+      "discovered": 5,
+      "exercised": 0,
+      "verified": 0
+    },
+    {
+      "repository": "react-hook-form/react-hook-form",
+      "scope": "src",
+      "upstreamSha": "06e4efdd28ec346196c38efd0909011e2f83064b",
+      "testFiles": 114,
+      "testFilesAnalyzed": 29,
+      "discovered": 0,
+      "exercised": 0,
+      "verified": 0,
+      "discovery": {
+        "testFilesWithRuntimeJsx": 48,
+        "importsExamined": 40,
+        "importsResolved": 40
+      }
+    },
+    {
+      "repository": "refinedev/refine",
+      "scope": "packages/mui",
+      "upstreamSha": "779d52a20e29b0307ac0df04d135beba434370dc",
+      "testFiles": 39,
+      "testFilesAnalyzed": 24,
+      "discovered": 5,
+      "exercised": 0,
+      "verified": 0
+    },
+    {
+      "repository": "rjsf-team/react-jsonschema-form",
+      "scope": "packages/mui",
+      "upstreamSha": "a99a17b9ca64622ca8bcca2cca69df567d211aa8",
+      "testFiles": 6,
+      "testFilesAnalyzed": 1,
+      "discovered": 0,
+      "exercised": 0,
+      "verified": 0
+    },
+    {
+      "repository": "viclafouch/mui-file-input",
+      "scope": "src",
+      "upstreamSha": "9cb067548f0fbb3ea91704aee03f5c088ab33264",
+      "testFiles": 1,
+      "testFilesAnalyzed": 1,
+      "discovered": 0,
+      "exercised": 0,
+      "verified": 0
+    }
+  ],
+  "interpretation": {
+    "baselineProductionContractsStable": true,
+    "knownFalseVerified": 0,
+    "nextPriority": "package/workspace-aware self-import resolution"
+  }
+}

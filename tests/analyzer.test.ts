@@ -177,3 +177,80 @@ test('does not infer through an unresolved spread that may override known props'
   assert.equal(report.results[0]?.status, 'discovered');
   assert.equal(report.scores.behaviorReach, 0);
 });
+
+test('rejects an explicitly incompatible Testing Library role as interaction evidence', () => {
+  const testSource = `
+    it('clicks an unrelated checkbox', async () => {
+      const onSave = vi.fn();
+      render(<><SaveButton disabled onSave={onSave} /><input type="checkbox" /></>);
+      await user.click(screen.getByRole('checkbox'));
+      expect(onSave).not.toHaveBeenCalled();
+    });
+  `;
+
+  const report = analyzeReactSources({ componentSource, testSource });
+  assert.equal(report.results[0]?.status, 'discovered');
+  assert.equal(report.scores.behaviorReach, 0);
+  assert.match(report.results[0]?.reason ?? '', /expected button/);
+});
+
+test('keeps a compatible Testing Library role as EXERCISED when the oracle is missing', () => {
+  const testSource = `
+    it('clicks the disabled button without an oracle', async () => {
+      const onSave = vi.fn();
+      render(<SaveButton disabled onSave={onSave} />);
+      await user.click(screen.getByRole('button'));
+    });
+  `;
+
+  const report = analyzeReactSources({ componentSource, testSource });
+  assert.equal(report.results[0]?.status, 'exercised');
+  assert.equal(report.scores.behaviorReach, 100);
+  assert.equal(report.scores.behaviorVerification, 0);
+});
+
+test('keeps a compatible role-bound target as VERIFIED', () => {
+  const testSource = `
+    it('verifies a role-bound button target', async () => {
+      const onSave = vi.fn();
+      render(<SaveButton disabled onSave={onSave} />);
+      const saveButton = screen.getByRole('button');
+      await user.click(saveButton);
+      expect(onSave).not.toHaveBeenCalled();
+    });
+  `;
+
+  const report = analyzeReactSources({ componentSource, testSource });
+  assert.equal(report.results[0]?.status, 'verified');
+  assert.equal(report.scores.behaviorVerification, 100);
+});
+
+test('rejects an incompatible role-bound target even when the callback oracle follows it', () => {
+  const testSource = `
+    it('uses a bound unrelated target', async () => {
+      const onSave = vi.fn();
+      render(<><SaveButton disabled onSave={onSave} /><input type="checkbox" /></>);
+      const unrelated = screen.getByRole('checkbox');
+      await user.click(unrelated);
+      expect(onSave).not.toHaveBeenCalled();
+    });
+  `;
+
+  const report = analyzeReactSources({ componentSource, testSource });
+  assert.equal(report.results[0]?.status, 'discovered');
+  assert.equal(report.scores.behaviorVerification, 0);
+});
+
+test('does not reject an interaction when the target role is unknown', () => {
+  const testSource = `
+    it('uses a text query that does not expose role evidence', async () => {
+      const onSave = vi.fn();
+      render(<SaveButton disabled onSave={onSave} />);
+      await user.click(screen.getByText('Save'));
+      expect(onSave).not.toHaveBeenCalled();
+    });
+  `;
+
+  const report = analyzeReactSources({ componentSource, testSource });
+  assert.equal(report.results[0]?.status, 'verified');
+});

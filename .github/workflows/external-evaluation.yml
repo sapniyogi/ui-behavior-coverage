@@ -7,6 +7,7 @@ on:
       - agent/phase-6-production-readiness
       - agent/phase-7-semantic-evidence
       - agent/phase-7-5-alpha-readiness-v2
+      - agent/phase-8a-target-aware-precision
   workflow_dispatch:
 
 permissions:
@@ -16,7 +17,7 @@ jobs:
   evaluate:
     name: ${{ matrix.slug }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -45,6 +46,26 @@ jobs:
             repository: refinedev/refine
             scope: packages/mui
             sha: 779d52a20e29b0307ac0df04d135beba434370dc
+          - slug: mui-material
+            repository: mui/material-ui
+            scope: packages/mui-material
+            sha: 48c6663a66b7eacbd9c7c411863ab5d18dbeea88
+          - slug: rjsf-mui
+            repository: rjsf-team/react-jsonschema-form
+            scope: packages/mui
+            sha: a99a17b9ca64622ca8bcca2cca69df567d211aa8
+          - slug: react-hook-form-mui
+            repository: dohomi/react-hook-form-mui
+            scope: packages/rhf-mui
+            sha: b19c844a3fb39778ece6f4ae19ed5c10b960346e
+          - slug: react-hook-form
+            repository: react-hook-form/react-hook-form
+            scope: src
+            sha: 06e4efdd28ec346196c38efd0909011e2f83064b
+          - slug: mui-file-input
+            repository: viclafouch/mui-file-input
+            scope: src
+            sha: 9cb067548f0fbb3ea91704aee03f5c088ab33264
 
     steps:
       - name: Checkout analyzer
@@ -81,7 +102,7 @@ jobs:
           ROOT="external/${{ matrix.slug }}/${{ matrix.scope }}"
           TEST_FILES=$(find "$ROOT" -type f \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.test.js' -o -name '*.test.jsx' -o -name '*.spec.ts' -o -name '*.spec.tsx' -o -name '*.spec.js' -o -name '*.spec.jsx' \) | wc -l | tr -d ' ')
           TSX_FILES=$(find "$ROOT" -type f -name '*.tsx' | wc -l | tr -d ' ')
-          MUI_FILES=$(grep -RIl --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' '@mui/material' "$ROOT" 2>/dev/null | wc -l | tr -d ' ')
+          MUI_FILES=$( { grep -RIl --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' '@mui/material' "$ROOT" 2>/dev/null || true; } | wc -l | tr -d ' ')
           printf '{"testFiles":%s,"tsxFiles":%s,"muiImportFiles":%s}\n' "$TEST_FILES" "$TSX_FILES" "$MUI_FILES" > "external/${{ matrix.slug }}-inventory.json"
           cat "external/${{ matrix.slug }}-inventory.json"
       - name: Run ui-behavior-coverage
