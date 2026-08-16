@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { analyzeTestsAgainstBehaviors } from '../src/react/analyze-tests';
+import { analyzeTestsAgainstBehaviors } from '../src/react/analyze-tests-target-aware';
 import { extractComponentBehaviors } from '../src/react/extract-component-behaviors';
 import { extractDirectMaterialUiTestBehaviors } from '../src/providers/material-ui';
 
@@ -124,6 +124,27 @@ test('MUI Checkbox assertion for the wrong next state is not sufficient', () => 
 
   const [result] = analyzeTestsAgainstBehaviors(testSource, [behavior]);
   assert.equal(result?.status, 'exercised');
+});
+
+test('target-aware MUI Checkbox analysis rejects a click on an unrelated button', () => {
+  const behavior = extractComponentBehaviors(muiCheckboxWrapper)
+    .find((candidate) => candidate.kind === 'mui-checkbox-checked-toggle' && candidate.condition.value === false);
+  assert.ok(behavior);
+
+  const testSource = `
+    test('clicks something else', async () => {
+      const onChange = vi.fn();
+      render(<><ConsentCheckbox checked={false} disabled={false} onChange={onChange} /><button>Save</button></>);
+      await user.click(screen.getByRole('button'));
+      expect(onChange).toHaveBeenCalledWith(
+        expect.objectContaining({ target: expect.objectContaining({ checked: true }) })
+      );
+    });
+  `;
+
+  const [result] = analyzeTestsAgainstBehaviors(testSource, [behavior]);
+  assert.equal(result?.status, 'discovered');
+  assert.match(result?.reason ?? '', /checkbox or switch/);
 });
 
 test('direct Material UI Button tests can be analyzed without a wrapper component', () => {
