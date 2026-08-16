@@ -7,6 +7,7 @@ on:
       - agent/phase-6-production-readiness
       - agent/phase-7-semantic-evidence
       - agent/phase-7-5-alpha-readiness-v2
+      - agent/phase-8a-target-aware-precision
   workflow_dispatch:
 
 permissions:
@@ -16,7 +17,7 @@ jobs:
   evaluate:
     name: ${{ matrix.slug }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -45,6 +46,14 @@ jobs:
             repository: refinedev/refine
             scope: packages/mui
             sha: 779d52a20e29b0307ac0df04d135beba434370dc
+          - slug: mui-material
+            repository: mui/material-ui
+            scope: packages/mui-material
+            sha: 48c6663a66b7eacbd9c7c411863ab5d18dbeea88
+          - slug: rjsf-mui
+            repository: rjsf-team/react-jsonschema-form
+            scope: packages/mui
+            sha: a99a17b9ca64622ca8bcca2cca69df567d211aa8
 
     steps:
       - name: Checkout analyzer
