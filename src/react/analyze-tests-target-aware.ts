@@ -3,8 +3,13 @@ import type { BehaviorContract, BehaviorResult, BehaviorStatus } from '../core/m
 import { analyzeTestsAgainstBehaviors as analyzeTestsByEventName } from './analyze-tests';
 
 interface ParsedTestCase {
-  name: string;
   body: ts.Node;
+  sourceStart: number;
+  sourceText: string;
+}
+
+interface MaskedTestCase {
+  maskedCount: number;
   sourceText: string;
 }
 
@@ -21,11 +26,6 @@ function isTestCall(node: ts.CallExpression): boolean {
   return ts.isIdentifier(node.expression) && (node.expression.text === 'it' || node.expression.text === 'test');
 }
 
-function testName(node: ts.CallExpression): string {
-  const first = node.arguments[0];
-  return first && ts.isStringLiteralLike(first) ? first.text : '<anonymous test>';
-}
-
 function collectTestCases(sourceFile: ts.SourceFile): ParsedTestCase[] {
   const cases: ParsedTestCase[] = [];
 
@@ -34,8 +34,8 @@ function collectTestCases(sourceFile: ts.SourceFile): ParsedTestCase[] {
       const callback = node.arguments[1];
       if (callback && (ts.isArrowFunction(callback) || ts.isFunctionExpression(callback))) {
         cases.push({
-          name: testName(node),
           body: callback.body,
+          sourceStart: node.getStart(sourceFile),
           sourceText: node.getText(sourceFile),
         });
       }
@@ -206,16 +206,20 @@ function firstMatchingRenderPosition(testBody: ts.Node, behavior: BehaviorContra
   return position;
 }
 
-function hasTargetCompatibleInteraction(testBody: ts.Node, behavior: BehaviorContract): boolean {
+function maskIncompatibleInteractions(
+  testCase: ParsedTestCase,
+  behavior: BehaviorContract,
+): MaskedTestCase {
   const expectedRoles = expectedTargetRoles(behavior);
-  if (!expectedRoles) return true;
+  if (!expectedRoles) return { maskedCount: 0, sourceText: testCase.sourceText };
 
-  const bindings = collectRoleBindings(testBody);
-  const renderPosition = firstMatchingRenderPosition(testBody, behavior);
-  let compatible = false;
+  const bindings = collectRoleBindings(testCase.body);
+  const renderPosition = firstMatchingRenderPosition(testCase.body, behavior);
+  if (renderPosition < 0) return { maskedCount: 0, sourceText: testCase.sourceText };
+
+  const replacements: Array<{ end: number; start: number }> = [];
 
   const visit = (node: ts.Node): void => {
-    if (compatible) return;
     if (
       ts.isCallExpression(node) &&
       ts.isPropertyAccessExpression(node.expression) &&
@@ -223,28 +227,39 @@ function hasTargetCompatibleInteraction(testBody: ts.Node, behavior: BehaviorCon
       node.getStart() > renderPosition
     ) {
       const knownRole = targetRole(node.arguments[0], bindings);
-      if (!knownRole || expectedRoles.includes(knownRole)) {
-        compatible = true;
-        return;
+      if (knownRole && !expectedRoles.includes(knownRole)) {
+        replacements.push({
+          start: node.expression.name.getStart() - testCase.sourceStart,
+          end: node.expression.name.getEnd() - testCase.sourceStart,
+        });
       }
     }
     ts.forEachChild(node, visit);
   };
 
-  visit(testBody);
-  return compatible;
+  visit(testCase.body);
+  if (replacements.length === 0) return { maskedCount: 0, sourceText: testCase.sourceText };
+
+  let sourceText = testCase.sourceText;
+  for (const replacement of replacements.sort((a, b) => b.start - a.start)) {
+    sourceText = `${sourceText.slice(0, replacement.start)}__ubc_incompatible_${behavior.event.eventName}${sourceText.slice(replacement.end)}`;
+  }
+
+  return { maskedCount: replacements.length, sourceText };
 }
 
 function incompatibleTargetResult(
   result: BehaviorResult,
   behavior: BehaviorContract,
+  original: BehaviorResult,
 ): BehaviorResult {
   const roles = expectedTargetRoles(behavior);
   return {
+    ...result,
     behavior,
     status: 'discovered',
-    testName: result.testName,
-    callbackVariable: result.callbackVariable,
+    testName: result.testName ?? original.testName,
+    callbackVariable: result.callbackVariable ?? original.callbackVariable,
     reason: roles
       ? `The test renders the behavior, but its ${behavior.event.eventName} interaction targets an explicitly incompatible Testing Library role; expected ${roles.join(' or ')} when the target role is known.`
       : result.reason,
@@ -266,13 +281,26 @@ function strongestTargetAwareResult(
   let strongest: BehaviorResult | undefined;
 
   for (const testCase of testCases) {
-    const candidate = analyzeTestsByEventName(testCase.sourceText, [behavior], fileName)[0];
-    if (!candidate || !candidate.testName) continue;
+    const masked = maskIncompatibleInteractions(testCase, behavior);
+    const candidate = analyzeTestsByEventName(masked.sourceText, [behavior], fileName)[0];
+    const original = masked.maskedCount > 0
+      ? analyzeTestsByEventName(testCase.sourceText, [behavior], fileName)[0]
+      : candidate;
+
+    if (!candidate || !original) continue;
 
     const targetAware =
-      candidate.status !== 'discovered' && !hasTargetCompatibleInteraction(testCase.body, behavior)
-        ? incompatibleTargetResult(candidate, behavior)
-        : candidate;
+      masked.maskedCount > 0 &&
+      candidate.status === 'discovered' &&
+      statusRank[original.status] > statusRank[candidate.status]
+        ? incompatibleTargetResult(candidate, behavior, original)
+        : {
+            ...candidate,
+            testName: candidate.testName ?? original.testName,
+            callbackVariable: candidate.callbackVariable ?? original.callbackVariable,
+          };
+
+    if (!targetAware.testName) continue;
 
     if (!strongest || statusRank[targetAware.status] > statusRank[strongest.status]) {
       strongest = targetAware;
@@ -281,14 +309,24 @@ function strongestTargetAwareResult(
     if (strongest.status === 'verified') break;
   }
 
-  return strongest ?? analyzeTestsByEventName(fullTestSource, [behavior], fileName)[0]!;
+  if (strongest) return strongest;
+
+  const fallback = analyzeTestsByEventName(fullTestSource, [behavior], fileName)[0]!;
+  return testCases.length === 0 || fallback.status === 'discovered'
+    ? fallback
+    : {
+        ...fallback,
+        status: 'discovered',
+        reason: 'No individual test case provided target-compatible interaction evidence for this behavior.',
+      };
 }
 
 /**
- * Adds a conservative target-compatibility check on top of the existing callback
- * analyzer. Testing Library role evidence is used only to reject interactions
- * that are provably aimed at a different kind of element. Unknown targets remain
- * eligible so existing non-role query styles do not become false negatives.
+ * Adds a conservative target-compatibility layer on top of the existing callback
+ * analyzer. Calls aimed at a known, incompatible Testing Library role are masked
+ * before event/oracle analysis, so only compatible or unknown targets can satisfy
+ * interaction ordering. Unknown target styles remain eligible to avoid inventing
+ * false negatives for unsupported query forms.
  */
 export function analyzeTestsAgainstBehaviors(
   testSource: string,
