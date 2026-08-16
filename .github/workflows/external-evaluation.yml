@@ -58,6 +58,10 @@ jobs:
             repository: dohomi/react-hook-form-mui
             scope: packages/rhf-mui
             sha: b19c844a3fb39778ece6f4ae19ed5c10b960346e
+          - slug: react-hook-form
+            repository: react-hook-form/react-hook-form
+            scope: src
+            sha: 06e4efdd28ec346196c38efd0909011e2f83064b
           - slug: mui-file-input
             repository: viclafouch/mui-file-input
             scope: src
