@@ -1,0 +1,61 @@
+{
+  "evaluation": "phase-8a-workspace-self-imports",
+  "date": "2026-08-15",
+  "workflowRun": 31922230473,
+  "evaluatedCommit": "11d71e11211725a4e99eb662cc510d52d45a2d4f",
+  "baseline": {
+    "testFilesInventoried": 835,
+    "testFilesPaired": 304,
+    "discovered": 14,
+    "exercised": 2,
+    "verified": 1
+  },
+  "current": {
+    "testFilesInventoried": 835,
+    "testFilesPaired": 527,
+    "discovered": 14,
+    "exercised": 2,
+    "verified": 1
+  },
+  "muiMaterial": {
+    "repository": "mui/material-ui",
+    "scope": "packages/mui-material",
+    "upstreamSha": "48c6663a66b7eacbd9c7c411863ab5d18dbeea88",
+    "before": {
+      "totalTestFiles": 294,
+      "testFilesWithRuntimeJsx": 255,
+      "testFilesWithTargets": 23,
+      "testFilesAnalyzed": 23,
+      "importsExamined": 509,
+      "importsResolved": 25,
+      "externalModule": 484,
+      "componentsAnalyzed": 23,
+      "discovered": 0,
+      "exercised": 0,
+      "verified": 0
+    },
+    "after": {
+      "totalTestFiles": 294,
+      "testFilesWithRuntimeJsx": 255,
+      "testFilesWithTargets": 246,
+      "testFilesAnalyzed": 246,
+      "importsExamined": 509,
+      "importsResolved": 491,
+      "externalModule": 18,
+      "componentsAnalyzed": 148,
+      "discovered": 0,
+      "exercised": 0,
+      "verified": 0
+    }
+  },
+  "audit": {
+    "carriedForwardContracts": 14,
+    "validAuditedContracts": 14,
+    "reachedClassificationsAudited": 2,
+    "reachedClassificationsCorrect": 2,
+    "verifiedClassificationsAudited": 1,
+    "verifiedClassificationsCorrect": 1,
+    "knownFalseVerified": 0,
+    "note": "Small-sample release-gate observation; not a statistical precision estimate. No new positive classifications were introduced by this increment."
+  }
+}
