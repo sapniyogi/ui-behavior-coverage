@@ -54,6 +54,14 @@ jobs:
             repository: rjsf-team/react-jsonschema-form
             scope: packages/mui
             sha: a99a17b9ca64622ca8bcca2cca69df567d211aa8
+          - slug: react-hook-form-mui
+            repository: dohomi/react-hook-form-mui
+            scope: packages/rhf-mui
+            sha: b19c844a3fb39778ece6f4ae19ed5c10b960346e
+          - slug: mui-file-input
+            repository: viclafouch/mui-file-input
+            scope: src
+            sha: 9cb067548f0fbb3ea91704aee03f5c088ab33264
 
     steps:
       - name: Checkout analyzer
