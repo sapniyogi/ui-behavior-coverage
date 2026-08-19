@@ -208,14 +208,16 @@ function enclosingFunction(node: ts.Node): ts.FunctionLikeDeclaration | undefine
   return undefined;
 }
 
-function countFamilyCandidates(
+function countCandidates(
   target: ts.JsxOpeningLikeElement,
   family: ReadonlySet<string> | undefined,
 ): number | undefined {
-  if (!family) return undefined;
   const fn = enclosingFunction(target);
   if (!fn?.body) return undefined;
-  let count = 0;
+  const sourceTag = jsxTagName(target);
+  let familyCount = 0;
+  let sourceTagCount = 0;
+
   const visit = (node: ts.Node): void => {
     if (node !== fn && (
       ts.isFunctionDeclaration(node) ||
@@ -224,12 +226,18 @@ function countFamilyCandidates(
     )) return;
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
       const tag = jsxTagName(node);
-      if (tag && family.has(tag)) count += 1;
+      if (tag && family?.has(tag)) familyCount += 1;
+      if (tag && sourceTag && tag === sourceTag) sourceTagCount += 1;
     }
     ts.forEachChild(node, visit);
   };
   visit(fn.body);
-  return count > 0 ? count : undefined;
+
+  if (familyCount > 0) return familyCount;
+  // Project composition may move the evidence to a transparent custom wrapper
+  // (for example FeatureToggle -> MuiSwitchWrapper -> Switch). A single wrapper
+  // invocation is a valid uniqueness proof; multiple invocations stay ambiguous.
+  return sourceTagCount > 0 ? sourceTagCount : undefined;
 }
 
 function targetForBehavior(
@@ -247,7 +255,7 @@ function targetForBehavior(
     roles,
     accessibleName: accessibleName(element),
     testId: enumerableStringAttribute(element, 'data-testid'),
-    candidateCount: countFamilyCandidates(element, family),
+    candidateCount: countCandidates(element, family),
     sourceTag: tag,
   };
   if (
