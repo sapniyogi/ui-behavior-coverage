@@ -108,12 +108,6 @@ export function collectQueryBindings(root: ts.Node): Map<string, QueryTarget> {
   return bindings;
 }
 
-function rootIdentifier(expression: ts.Expression): string | undefined {
-  let current = expression;
-  while (ts.isPropertyAccessExpression(current)) current = current.expression;
-  return ts.isIdentifier(current) ? current.text : undefined;
-}
-
 export function queryTargetFromExpression(
   expression: ts.Expression | undefined,
   bindings: ReadonlyMap<string, QueryTarget>,
@@ -121,11 +115,7 @@ export function queryTargetFromExpression(
   if (!expression) return undefined;
   const current = unwrapExpression(expression);
   if (ts.isIdentifier(current)) return bindings.get(current.text);
-  if (ts.isPropertyAccessExpression(current)) {
-    const root = rootIdentifier(current);
-    return root ? bindings.get(root) : undefined;
-  }
-  if (ts.isElementAccessExpression(current)) {
+  if (ts.isPropertyAccessExpression(current) || ts.isElementAccessExpression(current)) {
     return queryTargetFromExpression(current.expression, bindings);
   }
   if (!ts.isCallExpression(current)) return undefined;
