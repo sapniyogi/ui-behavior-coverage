@@ -96,6 +96,31 @@ function stringJsxAttribute(node: ts.JsxOpeningLikeElement, name: string): strin
     : undefined;
 }
 
+function expressionStrings(expression: ts.Expression): string[] {
+  if (ts.isStringLiteralLike(expression)) return [expression.text];
+  if (ts.isParenthesizedExpression(expression)) return expressionStrings(expression.expression);
+  if (ts.isConditionalExpression(expression)) {
+    return [
+      ...expressionStrings(expression.whenTrue),
+      ...expressionStrings(expression.whenFalse),
+    ];
+  }
+  return [];
+}
+
+function enumerableStringAttribute(
+  node: ts.JsxOpeningLikeElement,
+  name: string,
+): string | readonly string[] | undefined {
+  const attribute = getAttribute(node, name);
+  if (!attribute?.initializer) return undefined;
+  if (ts.isStringLiteralLike(attribute.initializer)) return attribute.initializer.text;
+  if (!ts.isJsxExpression(attribute.initializer) || !attribute.initializer.expression) return undefined;
+  const values = [...new Set(expressionStrings(attribute.initializer.expression))];
+  if (values.length === 1) return values[0];
+  return values.length > 1 ? values : undefined;
+}
+
 function nestedStringProperty(
   node: ts.JsxOpeningLikeElement,
   containerName: string,
@@ -221,7 +246,7 @@ function targetForBehavior(
   const target: BehaviorTarget = {
     roles,
     accessibleName: accessibleName(element),
-    testId: stringJsxAttribute(element, 'data-testid'),
+    testId: enumerableStringAttribute(element, 'data-testid'),
     candidateCount: countFamilyCandidates(element, family),
     sourceTag: tag,
   };
