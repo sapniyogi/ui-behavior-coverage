@@ -1,5 +1,6 @@
 import ts from 'typescript';
 import type { BehaviorContract, BehaviorExpectation } from '../core/model';
+import { dedupeBehaviorContracts } from '../core/behavior-identity';
 import { materialUiBehaviorProvider } from '../providers/material-ui';
 import { materialUiCompositionProvider } from '../providers/material-ui-composition';
 import { nativeHtmlBehaviorProvider } from '../providers/native-html';
@@ -80,5 +81,9 @@ export function extractComponentBehaviors(
     }
   }
 
-  return attachBehaviorTargets(sourceText, fileName, merged);
+  return attachBehaviorTargets(
+    sourceText,
+    fileName,
+    dedupeBehaviorContracts(merged),
+  );
 }
