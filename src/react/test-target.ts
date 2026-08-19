@@ -161,12 +161,17 @@ export function queryTargetCorrelates(
   if (query.testId) return testIdMatches(query.testId, target.testId);
 
   const expectedName = target.accessibleName ?? dynamicAccessibleName;
-  if (query.name) return !!expectedName && matcherMatches(query.name, expectedName);
-  if (query.label) return !!expectedName && matcherMatches(query.label, expectedName);
+  if (query.name) {
+    return expectedName
+      ? matcherMatches(query.name, expectedName)
+      : !!query.role && target.candidateCount === 1;
+  }
+  if (query.label) {
+    return expectedName
+      ? matcherMatches(query.label, expectedName)
+      : target.candidateCount === 1;
+  }
 
-  // ByText/ByDisplayValue without a role/label/test-id is not a sufficiently
-  // strong identity signal for element-state verification.
   if (!query.role) return false;
-
   return target.candidateCount === 1;
 }
