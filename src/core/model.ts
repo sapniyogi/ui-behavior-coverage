@@ -61,7 +61,7 @@ export interface SourceEvidence {
 export interface BehaviorTarget {
   roles?: readonly string[];
   accessibleName?: string;
-  testId?: string;
+  testId?: string | readonly string[];
   /** Number of same-family candidate elements in the governing component. */
   candidateCount?: number;
   /** JSX tag at the source evidence location, useful for diagnostics only. */
