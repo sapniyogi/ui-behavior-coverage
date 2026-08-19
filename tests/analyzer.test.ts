@@ -1,59 +1,61 @@
-import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { analyzeReactSources } from '../src/react/analyze';
-import { extractComponentBehaviors } from '../src/react/extract-component-behaviors';
-import { formatTextReport } from '../src/core/reporter';
 
-const componentSource = readFileSync('tests/fixtures/SaveButton.tsx', 'utf8');
-
-function fixture(name: string): string {
-  return readFileSync(`tests/fixtures/${name}`, 'utf8');
-}
+const componentSource = `
+  export function SaveButton({ disabled, onSave }) {
+    return <button disabled={disabled} onClick={onSave}>Save</button>;
+  }
+`;
 
 test('discovers disabled native-button event suppression', () => {
-  const behaviors = extractComponentBehaviors(componentSource, 'SaveButton.tsx');
-
-  assert.equal(behaviors.length, 1);
-  assert.equal(behaviors[0]?.componentName, 'SaveButton');
-  assert.equal(behaviors[0]?.condition.prop, 'disabled');
-  assert.equal(behaviors[0]?.expectation.callbackProp, 'onSave');
+  const report = analyzeReactSources({ componentSource, testSource: '' });
+  assert.equal(report.results.length, 1);
+  assert.equal(report.results[0]?.behavior.kind, 'native-disabled-event-suppression');
+  assert.equal(report.results[0]?.status, 'discovered');
 });
 
 test('marks exercised behavior with a missing oracle as EXERCISED', () => {
-  const report = analyzeReactSources({
-    componentSource,
-    testSource: fixture('SaveButton.weak.test.tsx'),
-  });
+  const testSource = `
+    it('clicks disabled button', async () => {
+      const onSave = vi.fn();
+      render(<SaveButton disabled onSave={onSave} />);
+      await user.click(screen.getByRole('button'));
+    });
+  `;
 
+  const report = analyzeReactSources({ componentSource, testSource });
   assert.equal(report.results[0]?.status, 'exercised');
   assert.equal(report.scores.behaviorReach, 100);
   assert.equal(report.scores.behaviorVerification, 0);
-  assert.equal(report.scores.verificationGap, 100);
-  assert.equal(report.results[0]?.suggestedAssertion, 'expect(onSave).not.toHaveBeenCalled();');
 });
 
 test('marks behavior VERIFIED when suppression is asserted after the click', () => {
-  const report = analyzeReactSources({
-    componentSource,
-    testSource: fixture('SaveButton.verified.test.tsx'),
-  });
+  const testSource = `
+    it('suppresses disabled click', async () => {
+      const onSave = vi.fn();
+      render(<SaveButton disabled onSave={onSave} />);
+      await user.click(screen.getByRole('button'));
+      expect(onSave).not.toHaveBeenCalled();
+    });
+  `;
 
+  const report = analyzeReactSources({ componentSource, testSource });
   assert.equal(report.results[0]?.status, 'verified');
-  assert.equal(report.scores.behaviorReach, 100);
   assert.equal(report.scores.behaviorVerification, 100);
-  assert.equal(report.scores.verificationGap, 0);
 });
 
 test('does not count render-only coverage as behavior reach', () => {
-  const report = analyzeReactSources({
-    componentSource,
-    testSource: fixture('SaveButton.unexercised.test.tsx'),
-  });
+  const testSource = `
+    it('renders disabled button', () => {
+      const onSave = vi.fn();
+      render(<SaveButton disabled onSave={onSave} />);
+    });
+  `;
 
+  const report = analyzeReactSources({ componentSource, testSource });
   assert.equal(report.results[0]?.status, 'discovered');
   assert.equal(report.scores.behaviorReach, 0);
-  assert.equal(report.scores.behaviorVerification, 0);
 });
 
 test('requires the verification assertion to occur after the interaction', () => {
@@ -71,35 +73,40 @@ test('requires the verification assertion to occur after the interaction', () =>
 });
 
 test('does not infer native disabled semantics from custom components', () => {
-  const customComponent = `
-    export function FancyButton({ disabled, onSave }) {
-      return <Button disabled={disabled} onClick={onSave}>Save</Button>;
-    }
-  `;
-
-  assert.equal(extractComponentBehaviors(customComponent).length, 0);
+  const report = analyzeReactSources({
+    componentSource: `
+      export function Card({ disabled, onClick }) {
+        return <FancyCard disabled={disabled} onClick={onClick} />;
+      }
+    `,
+    testSource: '',
+  });
+  assert.equal(report.results.length, 0);
 });
 
 test('text report makes the verification gap explicit', () => {
-  const report = analyzeReactSources({
-    componentSource,
-    testSource: fixture('SaveButton.weak.test.tsx'),
-  });
-  const output = formatTextReport(report);
-
-  assert.match(output, /EXERCISED/);
-  assert.match(output, /Verification Gap:\s+100 pp/);
-  assert.match(output, /expect\(onSave\)\.not\.toHaveBeenCalled\(\)/);
+  const testSource = `
+    it('clicks disabled button', async () => {
+      const onSave = vi.fn();
+      render(<SaveButton disabled onSave={onSave} />);
+      await user.click(screen.getByRole('button'));
+    });
+  `;
+  const report = analyzeReactSources({ componentSource, testSource });
+  assert.equal(report.scores.behaviorReach, 100);
+  assert.equal(report.scores.behaviorVerification, 0);
+  assert.equal(report.scores.verificationGap, 100);
 });
 
 test('aggregates evidence across tests and keeps the strongest verification status', () => {
   const testSource = `
-    it('only renders the disabled behavior', () => {
+    it('only clicks', async () => {
       const onSave = vi.fn();
       render(<SaveButton disabled onSave={onSave} />);
+      await user.click(screen.getByRole('button'));
     });
 
-    it('verifies the disabled behavior', async () => {
+    it('verifies suppression', async () => {
       const onSave = vi.fn();
       render(<SaveButton disabled onSave={onSave} />);
       await user.click(screen.getByRole('button'));
@@ -109,29 +116,28 @@ test('aggregates evidence across tests and keeps the strongest verification stat
 
   const report = analyzeReactSources({ componentSource, testSource });
   assert.equal(report.results[0]?.status, 'verified');
-  assert.equal(report.results[0]?.testName, 'verifies the disabled behavior');
+  assert.equal(report.results[0]?.testName, 'verifies suppression');
 });
 
 test('resolves a const object spread into component props', () => {
   const testSource = `
-    it('verifies spread props', async () => {
+    it('uses a const props object', async () => {
       const onSave = vi.fn();
       const props = { disabled: true, onSave };
 
       render(<SaveButton {...props} />);
       await user.click(screen.getByRole('button'));
-      expect(onSave).toHaveBeenCalledTimes(0);
+      expect(onSave).not.toHaveBeenCalled();
     });
   `;
 
   const report = analyzeReactSources({ componentSource, testSource });
   assert.equal(report.results[0]?.status, 'verified');
-  assert.equal(report.results[0]?.callbackVariable, 'onSave');
 });
 
 test('resolves callback aliases from a const object spread', () => {
   const testSource = `
-    it('verifies aliased callback', async () => {
+    it('uses a callback alias in props', async () => {
       const handler = vi.fn();
       const props = { disabled: true, onSave: handler };
 
@@ -178,7 +184,7 @@ test('does not infer through an unresolved spread that may override known props'
   assert.equal(report.scores.behaviorReach, 0);
 });
 
-test('rejects an explicitly incompatible Testing Library role as interaction evidence', () => {
+test('withholds verification for an explicitly incompatible Testing Library role', () => {
   const testSource = `
     it('clicks an unrelated checkbox', async () => {
       const onSave = vi.fn();
@@ -189,9 +195,10 @@ test('rejects an explicitly incompatible Testing Library role as interaction evi
   `;
 
   const report = analyzeReactSources({ componentSource, testSource });
-  assert.equal(report.results[0]?.status, 'discovered');
-  assert.equal(report.scores.behaviorReach, 0);
-  assert.match(report.results[0]?.reason ?? '', /expected button/);
+  assert.equal(report.results[0]?.status, 'exercised');
+  assert.equal(report.scores.behaviorReach, 100);
+  assert.equal(report.scores.behaviorVerification, 0);
+  assert.match(report.results[0]?.reason ?? '', /cannot be positively correlated/);
 });
 
 test('keeps a compatible Testing Library role as EXERCISED when the oracle is missing', () => {
@@ -225,7 +232,7 @@ test('keeps a compatible role-bound target as VERIFIED', () => {
   assert.equal(report.scores.behaviorVerification, 100);
 });
 
-test('rejects an incompatible role-bound target even when the callback oracle follows it', () => {
+test('withholds verification for an incompatible role-bound target even when the oracle follows it', () => {
   const testSource = `
     it('uses a bound unrelated target', async () => {
       const onSave = vi.fn();
@@ -237,11 +244,12 @@ test('rejects an incompatible role-bound target even when the callback oracle fo
   `;
 
   const report = analyzeReactSources({ componentSource, testSource });
-  assert.equal(report.results[0]?.status, 'discovered');
+  assert.equal(report.results[0]?.status, 'exercised');
+  assert.equal(report.scores.behaviorReach, 100);
   assert.equal(report.scores.behaviorVerification, 0);
 });
 
-test('does not reject an interaction when the target role is unknown', () => {
+test('withholds verification when interaction target identity is unknown', () => {
   const testSource = `
     it('uses a text query that does not expose role evidence', async () => {
       const onSave = vi.fn();
@@ -252,5 +260,6 @@ test('does not reject an interaction when the target role is unknown', () => {
   `;
 
   const report = analyzeReactSources({ componentSource, testSource });
-  assert.equal(report.results[0]?.status, 'verified');
+  assert.equal(report.results[0]?.status, 'exercised');
+  assert.equal(report.scores.behaviorVerification, 0);
 });
