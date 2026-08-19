@@ -4,6 +4,7 @@ import type {
   BehaviorStatus,
   RenderStateBehaviorContract,
 } from '../core/model';
+import { dedupeBehaviorContracts } from '../core/behavior-identity';
 import {
   collectLexicalTestEnvironment,
   type RenderEvidence,
@@ -11,7 +12,6 @@ import {
 } from './semantic-test-environment';
 import { findSafeRenderEvidence } from './safe-render-evidence';
 import { findVerificationPosition } from './semantic-test-assertions';
-import { dedupeRenderStateBehaviors } from './render-state-identity';
 
 interface TestCase {
   name: string;
@@ -145,7 +145,7 @@ export function analyzeRenderStateTests(
     ts.ScriptKind.TSX,
   );
   const tests = collectTestCases(sourceFile);
-  const distinctBehaviors = dedupeRenderStateBehaviors(behaviors);
+  const distinctBehaviors = dedupeBehaviorContracts(behaviors);
 
   return distinctBehaviors.map((behavior) => {
     let strongest: BehaviorResult | undefined;
