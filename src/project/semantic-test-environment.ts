@@ -276,36 +276,65 @@ interface LocalWrapper {
   propsParameter?: string;
 }
 
-function localWrapper(
-  sourceFile: ts.SourceFile,
+function wrapperFromFunction(
+  fn: ts.FunctionDeclaration | ts.ArrowFunction | ts.FunctionExpression,
+): LocalWrapper | undefined {
+  const body = ts.isFunctionDeclaration(fn) ? fn.body : fn.body;
+  if (!body) return undefined;
+  const parameter = fn.parameters[0];
+  return {
+    body,
+    propsParameter: parameter && ts.isIdentifier(parameter.name)
+      ? parameter.name.text
+      : undefined,
+  };
+}
+
+function wrapperFromVariableStatement(
+  statement: ts.VariableStatement,
   name: string,
 ): LocalWrapper | undefined {
-  for (const statement of sourceFile.statements) {
-    if (ts.isFunctionDeclaration(statement) && statement.name?.text === name && statement.body) {
-      const parameter = statement.parameters[0];
-      return {
-        body: statement.body,
-        propsParameter: parameter && ts.isIdentifier(parameter.name)
-          ? parameter.name.text
-          : undefined,
-      };
+  for (const declaration of statement.declarationList.declarations) {
+    if (
+      !ts.isIdentifier(declaration.name) ||
+      declaration.name.text !== name ||
+      !declaration.initializer ||
+      (!ts.isArrowFunction(declaration.initializer) && !ts.isFunctionExpression(declaration.initializer))
+    ) continue;
+    return wrapperFromFunction(declaration.initializer);
+  }
+  return undefined;
+}
+
+function localWrapper(anchor: ts.Node, name: string): LocalWrapper | undefined {
+  let child: ts.Node = anchor;
+  let parent: ts.Node | undefined = anchor.parent;
+
+  while (parent) {
+    if (ts.isBlock(parent) || ts.isSourceFile(parent)) {
+      // Function declarations are block-scoped and hoisted, so inspect the whole
+      // nearest lexical container first.
+      for (const statement of parent.statements) {
+        if (
+          ts.isFunctionDeclaration(statement) &&
+          statement.name?.text === name
+        ) {
+          const wrapper = wrapperFromFunction(statement);
+          if (wrapper) return wrapper;
+        }
+      }
+
+      // Const/let wrapper expressions must be declared before the invocation.
+      const boundary = containingStatement(child, parent);
+      for (const statement of parent.statements) {
+        if (boundary && statement === boundary) break;
+        if (!ts.isVariableStatement(statement)) continue;
+        const wrapper = wrapperFromVariableStatement(statement, name);
+        if (wrapper) return wrapper;
+      }
     }
-    if (!ts.isVariableStatement(statement)) continue;
-    for (const declaration of statement.declarationList.declarations) {
-      if (
-        !ts.isIdentifier(declaration.name) ||
-        declaration.name.text !== name ||
-        !declaration.initializer ||
-        (!ts.isArrowFunction(declaration.initializer) && !ts.isFunctionExpression(declaration.initializer))
-      ) continue;
-      const parameter = declaration.initializer.parameters[0];
-      return {
-        body: declaration.initializer.body,
-        propsParameter: parameter && ts.isIdentifier(parameter.name)
-          ? parameter.name.text
-          : undefined,
-      };
-    }
+    child = parent;
+    parent = parent.parent;
   }
   return undefined;
 }
@@ -365,7 +394,7 @@ function matchingElementThroughLocalWrapper(
 ): WrappedElementMatch | undefined {
   const invocation = renderedOpeningElement(renderedExpression);
   if (!invocation || !ts.isIdentifier(invocation.tagName)) return undefined;
-  const wrapper = localWrapper(renderedExpression.getSourceFile(), invocation.tagName.text);
+  const wrapper = localWrapper(invocation, invocation.tagName.text);
   if (!wrapper) return undefined;
   const element = matchingElement(wrapper.body, componentName);
   if (!element) return undefined;
