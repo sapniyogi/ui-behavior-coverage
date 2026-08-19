@@ -9,6 +9,9 @@ on:
       - agent/phase-7-5-alpha-readiness-v2
       - agent/phase-8a-target-aware-precision
       - agent/phase-8a-corpus-expansion
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
