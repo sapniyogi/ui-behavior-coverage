@@ -138,10 +138,11 @@ function targetIsCorrelated(
   if (behavior.target) return queryTargetCorrelates(query, behavior.target);
 
   // Compatibility fallback for contracts created by external/custom providers
-  // that do not yet carry production target metadata.
+  // that do not yet carry production target metadata. Preserve the earlier rule:
+  // reject an explicitly incompatible role, but do not reject an unknown style.
   const expectedRoles = expectedTargetRoles(behavior);
-  if (!expectedRoles) return true;
-  return !!query?.role && expectedRoles.includes(query.role);
+  if (!expectedRoles || !query?.role) return true;
+  return expectedRoles.includes(query.role);
 }
 
 function maskUncorrelatedInteractions(
