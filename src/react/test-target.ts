@@ -137,6 +137,13 @@ function rolesOverlap(queryRole: string | undefined, targetRoles: readonly strin
   return targetRoles.includes(queryRole);
 }
 
+function testIdMatches(queryTestId: string, targetTestId: BehaviorTarget['testId']): boolean {
+  if (!targetTestId) return false;
+  return typeof targetTestId === 'string'
+    ? queryTestId === targetTestId
+    : targetTestId.includes(queryTestId);
+}
+
 /**
  * Positive identity proof for a Testing Library query and a production target.
  * Named/test-id evidence is strongest. A role-only query is accepted only when
@@ -151,7 +158,7 @@ export function queryTargetCorrelates(
   if (!query || !query.singular) return false;
   if (!rolesOverlap(query.role, target.roles)) return false;
 
-  if (query.testId) return !!target.testId && query.testId === target.testId;
+  if (query.testId) return testIdMatches(query.testId, target.testId);
 
   const expectedName = target.accessibleName ?? dynamicAccessibleName;
   if (query.name) return !!expectedName && matcherMatches(query.name, expectedName);
