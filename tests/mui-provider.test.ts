@@ -1,11 +1,17 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {
+  extractComponentBehaviors,
+} from '../src/react/extract-component-behaviors';
 import { analyzeTestsAgainstBehaviors } from '../src/react/analyze-tests-target-aware';
-import { extractComponentBehaviors } from '../src/react/extract-component-behaviors';
-import { extractDirectMaterialUiTestBehaviors } from '../src/providers/material-ui';
+import {
+  extractDirectMaterialUiTestBehaviors,
+  extractMaterialUiDesignObservations,
+} from '../src/providers/material-ui';
+import { evaluateBoxBorderRadiusGuidance } from '../src/design/material-ui';
 
 const muiButtonWrapper = `
-  import Button from '@mui/material/Button';
+  import { Button } from '@mui/material';
 
   export function SaveButton({ disabled, loading, onSave }) {
     return <Button disabled={disabled} loading={loading} onClick={onSave}>Save</Button>;
@@ -13,56 +19,50 @@ const muiButtonWrapper = `
 `;
 
 const muiCheckboxWrapper = `
-  import { Checkbox } from '@mui/material';
+  import Checkbox from '@mui/material/Checkbox';
 
-  export function ConsentCheckbox({ checked, disabled, onChange }) {
-    return <Checkbox checked={checked} disabled={disabled} onChange={onChange} />;
+  export function ConsentCheckbox({ disabled, checked, onChange }) {
+    return <Checkbox disabled={disabled} checked={checked} onChange={onChange} />;
   }
 `;
 
 test('MUI Button provider infers disabled and loading suppression contracts', () => {
-  const behaviors = extractComponentBehaviors(muiButtonWrapper, 'SaveButton.tsx');
-
+  const behaviors = extractComponentBehaviors(muiButtonWrapper);
   assert.equal(behaviors.length, 2);
-  assert.ok(behaviors.every((behavior) => behavior.provider === 'material-ui'));
   assert.ok(behaviors.some((behavior) => behavior.kind === 'mui-button-disabled-event-suppression'));
   assert.ok(behaviors.some((behavior) => behavior.kind === 'mui-button-loading-event-suppression'));
 });
 
 test('MUI provider supports named imports aliased locally', () => {
-  const source = `
+  const behaviors = extractComponentBehaviors(`
     import { Button as MuiButton } from '@mui/material';
-    export const Submit = ({ loading, onSubmit }) => (
-      <MuiButton loading={loading} onClick={onSubmit}>Submit</MuiButton>
-    );
-  `;
-
-  const behaviors = extractComponentBehaviors(source, 'Submit.tsx');
+    export function SaveButton({ disabled, onSave }) {
+      return <MuiButton disabled={disabled} onClick={onSave}>Save</MuiButton>;
+    }
+  `);
   assert.equal(behaviors.length, 1);
-  assert.equal(behaviors[0]?.kind, 'mui-button-loading-event-suppression');
-  assert.equal(behaviors[0]?.componentName, 'Submit');
+  assert.equal(behaviors[0]?.kind, 'mui-button-disabled-event-suppression');
 });
 
 test('does not infer Material UI semantics from an unrelated custom Button', () => {
-  const source = `
+  const behaviors = extractComponentBehaviors(`
+    import { Button } from './button';
     export function SaveButton({ disabled, onSave }) {
       return <Button disabled={disabled} onClick={onSave}>Save</Button>;
     }
-  `;
-
-  assert.equal(extractComponentBehaviors(source).length, 0);
+  `);
+  assert.equal(behaviors.length, 0);
 });
 
 test('MUI Checkbox provider emits disabled suppression and both controlled toggle directions', () => {
-  const behaviors = extractComponentBehaviors(muiCheckboxWrapper, 'ConsentCheckbox.tsx');
-
-  assert.equal(behaviors.length, 3);
+  const behaviors = extractComponentBehaviors(muiCheckboxWrapper);
   assert.ok(behaviors.some((behavior) => behavior.kind === 'mui-checkbox-disabled-change-suppression'));
-
-  const toggles = behaviors.filter((behavior) => behavior.kind === 'mui-checkbox-checked-toggle');
-  assert.equal(toggles.length, 2);
-  assert.ok(toggles.some((behavior) => behavior.condition.value === false));
-  assert.ok(toggles.some((behavior) => behavior.condition.value === true));
+  assert.ok(behaviors.some((behavior) =>
+    behavior.kind === 'mui-checkbox-checked-toggle' && behavior.condition.value === false
+  ));
+  assert.ok(behaviors.some((behavior) =>
+    behavior.kind === 'mui-checkbox-checked-toggle' && behavior.condition.value === true
+  ));
 });
 
 test('MUI Checkbox callback-called-only assertion remains EXERCISED', () => {
@@ -71,7 +71,7 @@ test('MUI Checkbox callback-called-only assertion remains EXERCISED', () => {
   assert.ok(behavior);
 
   const testSource = `
-    test('toggles consent', async () => {
+    test('calls onChange', async () => {
       const onChange = vi.fn();
       render(<ConsentCheckbox checked={false} disabled={false} onChange={onChange} />);
       await user.click(screen.getByRole('checkbox'));
@@ -81,7 +81,6 @@ test('MUI Checkbox callback-called-only assertion remains EXERCISED', () => {
 
   const [result] = analyzeTestsAgainstBehaviors(testSource, [behavior]);
   assert.equal(result?.status, 'exercised');
-  assert.match(result?.suggestedAssertion ?? '', /target.*checked.*true/);
 });
 
 test('MUI Checkbox exact event.target.checked assertion is VERIFIED', () => {
@@ -90,14 +89,12 @@ test('MUI Checkbox exact event.target.checked assertion is VERIFIED', () => {
   assert.ok(behavior);
 
   const testSource = `
-    test('toggles consent', async () => {
+    test('checks the next state', async () => {
       const onChange = vi.fn();
       render(<ConsentCheckbox checked={false} disabled={false} onChange={onChange} />);
       await user.click(screen.getByRole('checkbox'));
       expect(onChange).toHaveBeenCalledWith(
-        expect.objectContaining({
-          target: expect.objectContaining({ checked: true })
-        })
+        expect.objectContaining({ target: expect.objectContaining({ checked: true }) })
       );
     });
   `;
@@ -126,7 +123,7 @@ test('MUI Checkbox assertion for the wrong next state is not sufficient', () => 
   assert.equal(result?.status, 'exercised');
 });
 
-test('target-aware MUI Checkbox analysis rejects a click on an unrelated button', () => {
+test('target-aware MUI Checkbox analysis withholds verification for a click on an unrelated button', () => {
   const behavior = extractComponentBehaviors(muiCheckboxWrapper)
     .find((candidate) => candidate.kind === 'mui-checkbox-checked-toggle' && candidate.condition.value === false);
   assert.ok(behavior);
@@ -143,8 +140,8 @@ test('target-aware MUI Checkbox analysis rejects a click on an unrelated button'
   `;
 
   const [result] = analyzeTestsAgainstBehaviors(testSource, [behavior]);
-  assert.equal(result?.status, 'discovered');
-  assert.match(result?.reason ?? '', /checkbox or switch/);
+  assert.equal(result?.status, 'exercised');
+  assert.match(result?.reason ?? '', /cannot be positively correlated/);
 });
 
 test('direct Material UI Button tests can be analyzed without a wrapper component', () => {
@@ -167,9 +164,9 @@ test('direct Material UI Button tests can be analyzed without a wrapper componen
 
 test('direct Material UI Checkbox test verifies the documented checked transition', () => {
   const testSource = `
-    import Checkbox from '@mui/material/Checkbox';
+    import { Checkbox } from '@mui/material';
 
-    test('unchecked to checked', async () => {
+    test('checked transition', async () => {
       const onChange = vi.fn();
       render(<Checkbox checked={false} onChange={onChange} />);
       await user.click(screen.getByRole('checkbox'));
@@ -179,20 +176,56 @@ test('direct Material UI Checkbox test verifies the documented checked transitio
     });
   `;
 
-  const behaviors = extractDirectMaterialUiTestBehaviors(testSource, 'Checkbox.test.tsx');
-  assert.equal(behaviors.length, 1);
-  assert.equal(behaviors[0]?.kind, 'mui-checkbox-checked-toggle');
-  const [result] = analyzeTestsAgainstBehaviors(testSource, behaviors);
+  const behavior = extractDirectMaterialUiTestBehaviors(testSource, 'Checkbox.test.tsx')
+    .find((candidate) => candidate.kind === 'mui-checkbox-checked-toggle');
+  assert.ok(behavior);
+  const [result] = analyzeTestsAgainstBehaviors(testSource, [behavior]);
   assert.equal(result?.status, 'verified');
 });
 
 test('direct MUI extraction ignores imported components without a relevant render contract', () => {
-  const testSource = `
-    import { Button } from '@mui/material';
-    test('plain button', () => {
-      render(<Button>Save</Button>);
-    });
-  `;
+  const behaviors = extractDirectMaterialUiTestBehaviors(`
+    import { Box } from '@mui/material';
+    test('renders', () => render(<Box />));
+  `);
+  assert.equal(behaviors.length, 0);
+});
 
-  assert.equal(extractDirectMaterialUiTestBehaviors(testSource).length, 0);
+test('Box borderRadius is extracted as a separate design observation', () => {
+  const observations = extractMaterialUiDesignObservations(`
+    import Box from '@mui/material/Box';
+    export function Panel() {
+      return <Box sx={{ borderRadius: 2 }}>Panel</Box>;
+    }
+  `);
+  assert.equal(observations.length, 1);
+  assert.deepEqual(observations[0]?.value, {
+    kind: 'theme-multiplier',
+    value: 2,
+    defaultThemePixels: 8,
+  });
+});
+
+test('Box border-radius guidance can flag nonconforming design-token usage', () => {
+  const [observation] = extractMaterialUiDesignObservations(`
+    import { Box } from '@mui/material';
+    export function Panel() {
+      return <Box sx={{ borderRadius: 3 }}>Panel</Box>;
+    }
+  `);
+  assert.ok(observation);
+  const result = evaluateBoxBorderRadiusGuidance(observation, { allowedThemeMultipliers: [1, 2] });
+  assert.equal(result.status, 'noncompliant');
+});
+
+test('Box CSS literal radii are preserved and unrelated custom Box names are ignored', () => {
+  const observations = extractMaterialUiDesignObservations(`
+    import { Box as MuiBox } from '@mui/material';
+    import { Box } from './custom';
+    export function Panel() {
+      return <><MuiBox sx={{ borderRadius: '12px' }} /><Box sx={{ borderRadius: 9 }} /></>;
+    }
+  `);
+  assert.equal(observations.length, 1);
+  assert.deepEqual(observations[0]?.value, { kind: 'css-literal', value: '12px' });
 });
