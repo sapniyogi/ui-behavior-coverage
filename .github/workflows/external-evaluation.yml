@@ -8,6 +8,7 @@ on:
       - agent/phase-7-semantic-evidence
       - agent/phase-7-5-alpha-readiness-v2
       - agent/phase-8a-target-aware-precision
+      - agent/phase-8a-corpus-expansion
   workflow_dispatch:
 
 permissions:
@@ -66,6 +67,22 @@ jobs:
             repository: viclafouch/mui-file-input
             scope: src
             sha: 9cb067548f0fbb3ea91704aee03f5c088ab33264
+          - slug: tournesol-frontend
+            repository: tournesol-app/tournesol
+            scope: frontend
+            sha: e1f4469404ba84e19ba3c1a5779488578206b9f6
+          - slug: talawa-admin
+            repository: PalisadoesFoundation/talawa-admin
+            scope: src
+            sha: 909d2193ece3f11ea880ea4352eda3f83e02cd53
+          - slug: joanie-admin
+            repository: openfun/joanie
+            scope: src/frontend/admin
+            sha: 39177a9c90858a8072347ad89e8889f591a2a251
+          - slug: jesusfilm-journeys-admin
+            repository: JesusFilm/core
+            scope: apps/journeys-admin
+            sha: 8ef37a60461ffac3ad34f01dff425a2f1c57d6ac
 
     steps:
       - name: Checkout analyzer
