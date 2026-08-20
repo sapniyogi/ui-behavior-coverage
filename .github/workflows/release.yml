@@ -1,0 +1,376 @@
+name: Manual npm release
+
+run-name: Release ${{ inputs.version }} to npm @${{ inputs.npm_tag }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact package version, for example 0.1.0-rc.0
+        required: true
+        default: 0.1.0-rc.0
+        type: string
+      npm_tag:
+        description: npm dist-tag
+        required: true
+        default: rc
+        type: choice
+        options:
+          - rc
+          - beta
+          - alpha
+          - latest
+      dry_run:
+        description: Validate everything without publishing
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: npm-release-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Validate and publish
+    runs-on: ubuntu-latest
+
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+      NPM_TAG: ${{ inputs.npm_tag }}
+
+    steps:
+      - name: Checkout release source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Verify release source is current main
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "$GITHUB_REF_NAME" != "main" ]]; then
+            echo "::error::Releases must be run from the main branch."
+            exit 1
+          fi
+
+          CHECKED_OUT_SHA="$(git rev-parse HEAD)"
+          if [[ "$CHECKED_OUT_SHA" != "$GITHUB_SHA" ]]; then
+            echo "::error::Checked-out commit does not match the workflow commit."
+            exit 1
+          fi
+
+          REMOTE_MAIN_SHA="$(git ls-remote origin refs/heads/main | cut -f1)"
+          if [[ "$REMOTE_MAIN_SHA" != "$GITHUB_SHA" ]]; then
+            echo "::error::main advanced after this release was started."
+            echo "Workflow commit: $GITHUB_SHA"
+            echo "Current main:    $REMOTE_MAIN_SHA"
+            echo "Run the release workflow again from the current main branch."
+            exit 1
+          fi
+
+          echo "Release source verified: $GITHUB_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Verify npm Trusted Publishing support
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          NPM_VERSION="$(npm --version)"
+          echo "npm version: $NPM_VERSION"
+
+          node - "$NPM_VERSION" <<'NODE'
+          const [major, minor, patch] = process.argv[2].split(".").map(Number);
+          const supported =
+            major > 11 ||
+            (major === 11 && (minor > 5 || (minor === 5 && patch >= 1)));
+
+          if (!supported) {
+            console.error(
+              `npm ${process.argv[2]} is too old for npm Trusted Publishing; npm >= 11.5.1 is required.`,
+            );
+            process.exit(1);
+          }
+          NODE
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Validate release metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node <<'NODE'
+          const fs = require("node:fs");
+
+          const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+          const lock = JSON.parse(fs.readFileSync("package-lock.json", "utf8"));
+          const changelog = fs.readFileSync("CHANGELOG.md", "utf8");
+          const version = process.env.RELEASE_VERSION;
+          const tag = process.env.NPM_TAG;
+
+          function fail(message) {
+            console.error(`Release validation failed: ${message}`);
+            process.exit(1);
+          }
+
+          if (pkg.private !== false) {
+            fail("package.json must contain private=false");
+          }
+
+          if (pkg.version !== version) {
+            fail(
+              `workflow version '${version}' does not match package.json version '${pkg.version}'`,
+            );
+          }
+
+          if (lock.version !== version || lock.packages?.[""]?.version !== version) {
+            fail("package-lock.json version does not match the requested release version");
+          }
+
+          if (pkg.publishConfig?.access !== "public") {
+            fail("publishConfig.access must be 'public'");
+          }
+
+          if (pkg.publishConfig?.tag !== tag) {
+            fail(
+              `workflow npm tag '${tag}' does not match publishConfig.tag '${pkg.publishConfig?.tag}'`,
+            );
+          }
+
+          const semver =
+            /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+
+          if (!semver.test(version)) {
+            fail(`'${version}' is not a valid supported SemVer release`);
+          }
+
+          if (tag === "latest") {
+            if (version.includes("-")) {
+              fail("a prerelease version must not be published under latest");
+            }
+          } else if (!version.includes(`-${tag}.`)) {
+            fail(`version '${version}' does not match npm tag '${tag}'`);
+          }
+
+          const expectedRepository =
+            `git+https://github.com/${process.env.GITHUB_REPOSITORY}.git`;
+
+          if (pkg.repository?.url !== expectedRepository) {
+            fail(
+              `repository.url '${pkg.repository?.url}' does not match '${expectedRepository}'`,
+            );
+          }
+
+          const escapedVersion = version.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const changelogHeading = new RegExp(`^##\\s+${escapedVersion}\\s*$`, "m");
+
+          if (!changelogHeading.test(changelog)) {
+            fail(`CHANGELOG.md does not contain a '## ${version}' section`);
+          }
+
+          console.log(`Package: ${pkg.name}`);
+          console.log(`Version: ${version}`);
+          console.log(`npm tag: ${tag}`);
+          console.log("Release metadata validated.");
+          NODE
+
+      - name: Inspect registry and Git tag state
+        id: state
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          NAME="$(node -p "require('./package.json').name")"
+          TAG="v${RELEASE_VERSION}"
+
+          set +e
+          VIEW_OUTPUT="$(npm view "${NAME}@${RELEASE_VERSION}" version 2>&1)"
+          VIEW_STATUS=$?
+          set -e
+
+          if [[ "$VIEW_STATUS" -eq 0 ]]; then
+            if [[ "$VIEW_OUTPUT" != "$RELEASE_VERSION" ]]; then
+              echo "::error::Unexpected registry response for ${NAME}@${RELEASE_VERSION}: ${VIEW_OUTPUT}"
+              exit 1
+            fi
+
+            TAG_VERSION="$(npm view "${NAME}@${NPM_TAG}" version 2>/dev/null || true)"
+            if [[ "$TAG_VERSION" != "$RELEASE_VERSION" ]]; then
+              echo "::error::${NAME}@${RELEASE_VERSION} already exists, but @${NPM_TAG} points to '${TAG_VERSION}'."
+              exit 1
+            fi
+
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "${NAME}@${RELEASE_VERSION} is already published with @${NPM_TAG}; publication can be skipped safely."
+          else
+            if ! grep -qE "E404|404 Not Found|No match found" <<< "$VIEW_OUTPUT"; then
+              echo "$VIEW_OUTPUT"
+              echo "::error::Unable to safely determine npm version availability."
+              exit 1
+            fi
+
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            echo "${NAME}@${RELEASE_VERSION} is available on npm."
+          fi
+
+          git fetch --tags origin
+
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            TAG_TARGET="$(git rev-list -n 1 "${TAG}")"
+            if [[ "$TAG_TARGET" != "$GITHUB_SHA" ]]; then
+              echo "::error::Existing Git tag ${TAG} points to ${TAG_TARGET}, not ${GITHUB_SHA}."
+              exit 1
+            fi
+            echo "git_tag_exists=true" >> "$GITHUB_OUTPUT"
+            echo "Git tag ${TAG} already points to this release commit."
+          else
+            echo "git_tag_exists=false" >> "$GITHUB_OUTPUT"
+            echo "Git tag ${TAG} is available."
+          fi
+
+      - name: Run release checks
+        run: npm run release:check
+
+      - name: Build exact release tarball
+        id: pack
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TARBALL="$(npm pack --silent)"
+          if [[ ! -f "$TARBALL" ]]; then
+            echo "::error::npm pack did not create ${TARBALL}"
+            exit 1
+          fi
+
+          echo "tarball=$TARBALL" >> "$GITHUB_OUTPUT"
+          echo "Release artifact: $TARBALL"
+          echo
+          tar -tzf "$TARBALL"
+
+      - name: Archive release package
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-${{ inputs.version }}
+          path: ${{ steps.pack.outputs.tarball }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: npm publish dry run
+        if: ${{ inputs.dry_run }}
+        run: |
+          npm publish \
+            "${{ steps.pack.outputs.tarball }}" \
+            --access public \
+            --tag "$NPM_TAG" \
+            --dry-run
+
+      - name: Publish to npm
+        if: ${{ !inputs.dry_run && steps.state.outputs.published != 'true' }}
+        run: |
+          npm publish \
+            "${{ steps.pack.outputs.tarball }}" \
+            --access public \
+            --tag "$NPM_TAG"
+
+      - name: Verify npm release
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          NAME="$(node -p "require('./package.json').name")"
+          SUCCESS=false
+
+          for attempt in {1..12}; do
+            VERSION_RESULT="$(npm view "${NAME}@${RELEASE_VERSION}" version 2>/dev/null || true)"
+            TAG_RESULT="$(npm view "${NAME}@${NPM_TAG}" version 2>/dev/null || true)"
+
+            if [[ "$VERSION_RESULT" == "$RELEASE_VERSION" && "$TAG_RESULT" == "$RELEASE_VERSION" ]]; then
+              SUCCESS=true
+              break
+            fi
+
+            echo "Registry not updated yet; retrying (${attempt}/12)..."
+            sleep 5
+          done
+
+          if [[ "$SUCCESS" != "true" ]]; then
+            echo "::error::Published version or npm dist-tag could not be verified."
+            exit 1
+          fi
+
+          echo "${NAME}@${RELEASE_VERSION} verified."
+          echo "${NPM_TAG} -> ${RELEASE_VERSION} verified."
+
+      - name: Create or verify Git tag
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TAG="v${RELEASE_VERSION}"
+
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            echo "Git tag ${TAG} already exists at the correct commit."
+            exit 0
+          fi
+
+          git tag "${TAG}" "$GITHUB_SHA"
+          git push origin "refs/tags/${TAG}"
+
+      - name: Create or update GitHub Release
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          TAG="v${RELEASE_VERSION}"
+          TARBALL="${{ steps.pack.outputs.tarball }}"
+
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            echo "GitHub Release ${TAG} already exists."
+          else
+            if [[ "$NPM_TAG" == "latest" ]]; then
+              gh release create "${TAG}" \
+                --title "${TAG}" \
+                --generate-notes \
+                --latest
+            else
+              gh release create "${TAG}" \
+                --title "${TAG}" \
+                --generate-notes \
+                --prerelease
+            fi
+          fi
+
+          gh release upload "${TAG}" "${TARBALL}#npm package" --clobber
+
+      - name: Release summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## npm release"
+            echo
+            echo "- Version: \`${RELEASE_VERSION}\`"
+            echo "- npm tag: \`${NPM_TAG}\`"
+            echo "- Source commit: \`${GITHUB_SHA}\`"
+            echo "- Dry run: \`${{ inputs.dry_run }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
