@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const repoRoot = process.cwd();
 const npmExecPath = process.env.npm_execpath;
+const packageJson = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
+const expectedVersion = packageJson.version;
 
 assert.ok(
   npmExecPath,
@@ -63,7 +65,7 @@ try {
     ['exec', '--', 'ui-behavior-coverage', '--version'],
     consumerRoot,
   ).trim();
-  assert.equal(version, '0.1.0-alpha.0');
+  assert.equal(version, expectedVersion);
 
   const help = runNpm(
     ['exec', '--', 'ui-behavior-coverage', '--help'],
@@ -78,7 +80,7 @@ try {
   );
   const scan = JSON.parse(scanOutput);
   assert.equal(scan.schemaVersion, '1');
-  assert.equal(scan.toolVersion, '0.1.0-alpha.0');
+  assert.equal(scan.toolVersion, expectedVersion);
   assert.equal(scan.reportType, 'project');
   assert.ok(scan.report.scores.discovered >= 1, 'installed package should discover fixture behavior');
 
@@ -89,7 +91,7 @@ try {
   );
   run(
     process.execPath,
-    ['--input-type=module', '-e', "const ubc=await import('ui-behavior-coverage'); if(typeof ubc.analyzeProject!=='function'||ubc.TOOL_VERSION!=='0.1.0-alpha.0') process.exit(1);"],
+    ['--input-type=module', '-e', `const ubc=await import('ui-behavior-coverage'); if(typeof ubc.analyzeProject!=='function'||ubc.TOOL_VERSION!==${JSON.stringify(expectedVersion)}) process.exit(1);`],
     consumerRoot,
   );
 
