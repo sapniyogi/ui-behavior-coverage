@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.0-rc.1
+
+Metadata and documentation hardening release. Analyzer behavior is unchanged from `0.1.0-rc.0`.
+
+Highlights:
+- broadened the package description around behavioral verification coverage rather than a Material UI-specific identity;
+- refreshed the README for the RC channel and `0.1.0-rc.1`;
+- added an AI-generated-test motivation section while keeping the analyzer generation-agnostic;
+- strengthened the manual release workflow to verify that the packaged README is present, non-empty, and identical to the repository README;
+- added post-publish registry verification that the version-specific npm `readme` metadata is populated before Git tagging and GitHub Release creation.
+
 ## 0.1.0-rc.0
 
 First release-candidate release.

@@ -27,15 +27,15 @@ const projectReport: ProjectAnalysisReport = {
   scores: emptyScores,
 };
 
-test('report schema and tool versions are stable for the alpha release', () => {
+test('report schema and tool versions are stable for the RC release', () => {
   assert.equal(REPORT_SCHEMA_VERSION, '1');
-  assert.equal(TOOL_VERSION, '0.1.0-alpha.0');
+  assert.equal(TOOL_VERSION, '0.1.0-rc.1');
 });
 
 test('component JSON envelope identifies schema, tool, type, and summary', () => {
   const json = createAnalysisJsonReport(componentReport);
   assert.equal(json.schemaVersion, '1');
-  assert.equal(json.toolVersion, '0.1.0-alpha.0');
+  assert.equal(json.toolVersion, '0.1.0-rc.1');
   assert.equal(json.reportType, 'component');
   assert.deepEqual(json.summary, emptyScores);
   assert.equal(json.report, componentReport);
@@ -44,7 +44,7 @@ test('component JSON envelope identifies schema, tool, type, and summary', () =>
 test('project JSON envelope identifies schema, tool, type, and summary', () => {
   const json = createProjectJsonReport(projectReport);
   assert.equal(json.schemaVersion, '1');
-  assert.equal(json.toolVersion, '0.1.0-alpha.0');
+  assert.equal(json.toolVersion, '0.1.0-rc.1');
   assert.equal(json.reportType, 'project');
   assert.deepEqual(json.summary, emptyScores);
   assert.equal(json.report, projectReport);
@@ -52,7 +52,7 @@ test('project JSON envelope identifies schema, tool, type, and summary', () => {
 
 test('versioned report helpers are available through the public package API', () => {
   assert.equal(publicApi.REPORT_SCHEMA_VERSION, '1');
-  assert.equal(publicApi.TOOL_VERSION, '0.1.0-alpha.0');
+  assert.equal(publicApi.TOOL_VERSION, '0.1.0-rc.1');
   assert.equal(typeof publicApi.createProjectJsonReport, 'function');
   assert.equal(typeof publicApi.createAnalysisJsonReport, 'function');
 });

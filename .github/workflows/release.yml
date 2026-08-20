@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Exact package version, for example 0.1.0-rc.0
+        description: Exact package version, for example 0.1.0-rc.1
         required: true
-        default: 0.1.0-rc.0
+        default: 0.1.0-rc.1
         type: string
       npm_tag:
         description: npm dist-tag
@@ -119,6 +119,8 @@ jobs:
           const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
           const lock = JSON.parse(fs.readFileSync("package-lock.json", "utf8"));
           const changelog = fs.readFileSync("CHANGELOG.md", "utf8");
+          const readme = fs.readFileSync("README.md", "utf8");
+          const reportSchema = fs.readFileSync("src/report-schema.ts", "utf8");
           const version = process.env.RELEASE_VERSION;
           const tag = process.env.NPM_TAG;
 
@@ -182,9 +184,36 @@ jobs:
             fail(`CHANGELOG.md does not contain a '## ${version}' section`);
           }
 
+          if (!readme.trim()) {
+            fail("README.md must not be empty");
+          }
+
+          if (!readme.includes("# ui-behavior-coverage")) {
+            fail("README.md is missing the package heading");
+          }
+
+          if (!readme.includes(version)) {
+            fail(`README.md does not mention release version '${version}'`);
+          }
+
+          const toolVersionMatch = reportSchema.match(
+            /export const TOOL_VERSION = '([^']+)' as const;/,
+          );
+
+          if (!toolVersionMatch) {
+            fail("src/report-schema.ts does not expose a recognizable TOOL_VERSION");
+          }
+
+          if (toolVersionMatch[1] !== version) {
+            fail(
+              `TOOL_VERSION '${toolVersionMatch[1]}' does not match release version '${version}'`,
+            );
+          }
+
           console.log(`Package: ${pkg.name}`);
           console.log(`Version: ${version}`);
           console.log(`npm tag: ${tag}`);
+          console.log(`README bytes: ${Buffer.byteLength(readme, "utf8")}`);
           console.log("Release metadata validated.");
           NODE
 
@@ -245,7 +274,7 @@ jobs:
       - name: Run release checks
         run: npm run release:check
 
-      - name: Build exact release tarball
+      - name: Build and verify exact release tarball
         id: pack
         shell: bash
         run: |
@@ -261,6 +290,27 @@ jobs:
           echo "Release artifact: $TARBALL"
           echo
           tar -tzf "$TARBALL"
+
+          if ! tar -tzf "$TARBALL" | grep -qx 'package/README.md'; then
+            echo "::error::Release tarball does not contain package/README.md."
+            exit 1
+          fi
+
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+          tar -xzf "$TARBALL" -C "$TMP_DIR" package/README.md
+
+          if ! cmp -s README.md "$TMP_DIR/package/README.md"; then
+            echo "::error::README.md in the release tarball differs from repository README.md."
+            exit 1
+          fi
+
+          if [[ ! -s "$TMP_DIR/package/README.md" ]]; then
+            echo "::error::README.md in the release tarball is empty."
+            exit 1
+          fi
+
+          echo "Tarball README verified ($(wc -c < "$TMP_DIR/package/README.md") bytes)."
 
       - name: Archive release package
         uses: actions/upload-artifact@v4
@@ -287,7 +337,7 @@ jobs:
             --access public \
             --tag "$NPM_TAG"
 
-      - name: Verify npm release
+      - name: Verify npm release and README metadata
         if: ${{ !inputs.dry_run }}
         shell: bash
         run: |
@@ -296,26 +346,32 @@ jobs:
           NAME="$(node -p "require('./package.json').name")"
           SUCCESS=false
 
-          for attempt in {1..12}; do
+          for attempt in {1..24}; do
             VERSION_RESULT="$(npm view "${NAME}@${RELEASE_VERSION}" version 2>/dev/null || true)"
             TAG_RESULT="$(npm view "${NAME}@${NPM_TAG}" version 2>/dev/null || true)"
+            README_RESULT="$(npm view "${NAME}@${RELEASE_VERSION}" readme 2>/dev/null || true)"
 
-            if [[ "$VERSION_RESULT" == "$RELEASE_VERSION" && "$TAG_RESULT" == "$RELEASE_VERSION" ]]; then
+            if [[ "$VERSION_RESULT" == "$RELEASE_VERSION" && \
+                  "$TAG_RESULT" == "$RELEASE_VERSION" && \
+                  -n "$README_RESULT" && \
+                  "$README_RESULT" == *"# ui-behavior-coverage"* && \
+                  "$README_RESULT" == *"${RELEASE_VERSION}"* ]]; then
               SUCCESS=true
               break
             fi
 
-            echo "Registry not updated yet; retrying (${attempt}/12)..."
+            echo "Registry metadata not fully updated yet; retrying (${attempt}/24)..."
             sleep 5
           done
 
           if [[ "$SUCCESS" != "true" ]]; then
-            echo "::error::Published version or npm dist-tag could not be verified."
+            echo "::error::Published version, npm dist-tag, or version-specific README metadata could not be verified."
             exit 1
           fi
 
           echo "${NAME}@${RELEASE_VERSION} verified."
           echo "${NPM_TAG} -> ${RELEASE_VERSION} verified."
+          echo "Version-specific npm README metadata verified."
 
       - name: Create or verify Git tag
         if: ${{ !inputs.dry_run }}

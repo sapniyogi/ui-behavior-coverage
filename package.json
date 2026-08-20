@@ -1,7 +1,7 @@
 {
   "name": "ui-behavior-coverage",
-  "version": "0.1.0-rc.0",
-  "description": "Behavioral verification coverage for React and Material UI component tests.",
+  "version": "0.1.0-rc.1",
+  "description": "Behavioral verification coverage for React tests: detect UI behavior tests exercise but fail to explicitly verify.",
   "license": "MIT",
   "private": false,
   "type": "commonjs",

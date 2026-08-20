@@ -1,17 +1,47 @@
 # ui-behavior-coverage
 
-Experimental behavioral verification coverage for React component tests, with first-class Material UI semantics.
+Behavioral verification coverage for React tests: detect UI behavior that tests exercise but fail to explicitly verify.
 
 Traditional code coverage asks **“did this code execute?”** `ui-behavior-coverage` asks a different question:
 
 > **Did the test explicitly verify the UI behavior it exercised?**
 
-> **Alpha status:** `0.1.0-alpha.0` is intentionally conservative and incomplete. Unsupported patterns are skipped rather than guessed. Treat findings as test-quality evidence to review, not as a replacement for test execution or browser automation.
+> **Release-candidate status:** `0.1.0-rc.1` is intentionally conservative. Unsupported or ambiguous patterns are skipped rather than guessed. Treat findings as test-quality evidence to review, not as a replacement for test execution or browser automation.
+
+## Why this matters for AI-generated tests
+
+AI coding assistants can generate tests that compile, render components, drive controls, and increase traditional execution coverage while still providing weak evidence that the intended UI outcome is correct.
+
+For example, a generated or human-written test can click a checkbox and assert only that *some* callback ran:
+
+```tsx
+await user.click(checkbox);
+expect(onChange).toHaveBeenCalled();
+```
+
+That is useful execution evidence, but it does not prove the expected checked value, callback payload, rendered state, or other observable contract.
+
+`ui-behavior-coverage` is **generation-agnostic**: it does not try to determine whether a human or an LLM wrote a test. Instead, it separates three questions:
+
+```text
+Code coverage:
+Did the implementation execute?
+
+Behavior Reach:
+Did the test exercise the UI behavior?
+
+Behavior Verification:
+Did the test explicitly prove the expected outcome?
+```
+
+This makes the tool useful for reviewing both human-authored and AI-generated React test suites, especially when passing tests or high line coverage can hide weak or missing behavioral oracles.
 
 ## Install and scan
 
+Install the current release candidate:
+
 ```bash
-npm install -D ui-behavior-coverage@alpha
+npm install -D ui-behavior-coverage@rc
 npx ui-behavior-coverage scan .
 ```
 
@@ -64,11 +94,13 @@ expect(onChange).toHaveBeenCalledWith(
 
 The same principle applies to rendered DOM state such as `toBeDisabled()`, `toBeChecked()`, `toHaveValue()`, visibility assertions, and explicit `aria-*` assertions.
 
-## Material UI support in the alpha
+## Material UI semantics in the RC
+
+Material UI is a first-class semantic provider, not the product boundary. The analyzer also understands supported native React/HTML behavior and follows a conservative subset of real React composition patterns.
 
 The analyzer recognizes MUI statically from imports; **it does not install or execute `@mui/material`**.
 
-| Capability | Alpha support |
+| Capability | RC support |
 |---|---|
 | Native `<button disabled>` callback suppression | ✅ |
 | MUI `Button` disabled/loading suppression | ✅ |
@@ -107,27 +139,27 @@ local wrapper / barrel / alias
        ↓
 simple prop forwarding or known normalization
        ↓
-Material UI component
+native or supported component semantics
        ↓
 semantic UI contract
        ↓
 test render/setup
        ↓
-matching assertion
+matching interaction and assertion
 ```
 
-Supported production-oriented paths include conservative boolean expressions, JSX spreads with override safeguards, recursive local component composition, `useThemeProps({ props, ... })`, and selected form bindings.
+Supported production-oriented paths include conservative boolean expressions, JSX spreads with override safeguards, recursive local component composition, `useThemeProps({ props, ... })`, selected form bindings, and target-aware correlation between production behavior and Testing Library evidence.
 
 Discovery telemetry is included in project reports so “zero behaviors” can be distinguished from “the scanner could not resolve this test surface.”
 
 ## Versioned JSON
 
-`--json` output is versioned from the first alpha:
+`--json` output has been versioned since the first public alpha:
 
 ```json
 {
   "schemaVersion": "1",
-  "toolVersion": "0.1.0-alpha.0",
+  "toolVersion": "0.1.0-rc.1",
   "reportType": "project",
   "summary": {
     "discovered": 9,
@@ -147,7 +179,7 @@ See [`docs/json-schema-v1.md`](docs/json-schema-v1.md).
 
 ## Programmatic API
 
-The alpha is CommonJS-compatible and can also be loaded by ESM consumers through Node interoperability:
+The RC is CommonJS-compatible and can also be loaded by ESM consumers through Node interoperability:
 
 ```ts
 import {
@@ -159,7 +191,7 @@ import {
 const report = analyzeProject('.');
 ```
 
-The public API also exposes provider, project-discovery, scoring, reporting, MUI semantic extraction, and Box design-guidance helpers. Public APIs may still change during the `0.x` alpha series; JSON schema changes will be versioned.
+The public API also exposes provider, project-discovery, scoring, reporting, MUI semantic extraction, and Box design-guidance helpers. Public APIs may still change during the `0.x` prerelease series; JSON schema changes will be versioned.
 
 ## Box and design-system guidance
 
@@ -190,22 +222,19 @@ See [`docs/design-guidance.md`](docs/design-guidance.md).
 
 ## External evaluation
 
-The current alpha release candidate has been evaluated against pinned scopes from **six** substantial public MUI repositories: OpenCTI, React Admin, MUI X Data Grid, Toolpad Core, Clash Verge Rev, and Refine MUI.
+The RC is evaluated with pinned external React/MUI application scopes and precision-focused regression fixtures. Phase 8A broadened the external corpus beyond the original alpha benchmark and hardened assertion-target correlation, interaction-target correlation, wrapper/control-flow handling, callback payload inference, and distinct behavior identity.
 
-Across the current pinned alpha corpus:
+The release strategy is deliberately precision-first: unsupported or ambiguous behavior remains unclassified rather than being guessed. The RC release gate includes type-checking, unit and consumer smoke tests, package-content validation, pinned external evaluation, adversarial regression fixtures, and manual adjudication of the high-value reached/verified findings before release.
 
-- **250** test files were paired/analyzed across the six scopes;
-- **14** conservative production contracts were discovered;
-- **2** were reached;
-- **1** was explicitly verified;
-- all **14** currently reported production contracts were manually reviewed for the alpha precision audit;
-- there are **0 known false VERIFIED** findings in that audited sample.
+Published evaluation records include:
 
-The original five-repository Phase 7 benchmark accounted for 226 paired test files and 9 contracts. Phase 7.5 adds Refine MUI at a pinned commit, where 24 test files are paired and 5 additional valid `loading=true → disabled=true` wrapper contracts are discovered. Those Refine contracts are not marked reached because the paired tests do not establish a statically resolvable `loading=true` condition.
+- [`docs/evaluations/2026-08-15-phase8a-target-aware-precision.md`](docs/evaluations/2026-08-15-phase8a-target-aware-precision.md)
+- [`docs/evaluations/2026-08-15-phase8a-workspace-self-imports.md`](docs/evaluations/2026-08-15-phase8a-workspace-self-imports.md)
+- [`docs/evaluations/2026-08-13-alpha-precision-audit.md`](docs/evaluations/2026-08-13-alpha-precision-audit.md)
 
-This remains a small evidence base, not a statistically strong accuracy claim. React Admin is currently the only benchmark repository with reached/verified contracts. The benchmark deliberately leaves unsupported or unproven surfaces unclassified rather than lowering inference precision to increase counts.
+The Phase 8A release hardening is also documented in [PR #15](https://github.com/sapniyogi/ui-behavior-coverage/pull/15).
 
-See [`docs/evaluations/2026-08-13-phase7-semantic-evidence.md`](docs/evaluations/2026-08-13-phase7-semantic-evidence.md), [`docs/evaluations/alpha-readiness.md`](docs/evaluations/alpha-readiness.md), and [`docs/evaluations/2026-08-13-alpha-precision-audit.md`](docs/evaluations/2026-08-13-alpha-precision-audit.md).
+These evaluations are evidence for the currently supported analyzer surface, not a statistically established universal accuracy rate.
 
 ## CLI exit codes
 
@@ -215,7 +244,7 @@ See [`docs/evaluations/2026-08-13-phase7-semantic-evidence.md`](docs/evaluations
 2  analysis/filesystem failure
 ```
 
-Verification gaps do not fail CI by default in `0.1.0-alpha.0`. Threshold-based CI policy is intentionally deferred until report semantics have more external validation.
+Verification gaps do not fail CI by default in the current RC. Threshold-based CI policy remains deferred until report semantics have broader external validation.
 
 ## Release quality gates
 
@@ -228,6 +257,8 @@ npm run pack:check
 ```
 
 `npm test` includes a clean consumer smoke path that packs the package, installs the resulting tarball into a temporary npm project, invokes the installed CLI, scans a fixture, and verifies CommonJS and ESM loading.
+
+The manual npm release workflow additionally checks that the release tarball contains the exact repository `README.md` and, after publication, verifies that npm exposes non-empty version-specific README metadata before Git tagging and GitHub Release creation.
 
 See [`docs/release.md`](docs/release.md).
 
