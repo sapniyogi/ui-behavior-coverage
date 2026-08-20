@@ -1,7 +1,7 @@
 import type { AnalysisReport, CoverageScores, ProjectAnalysisReport } from './core/model';
 
 export const REPORT_SCHEMA_VERSION = '1' as const;
-export const TOOL_VERSION = '0.1.0-alpha.0' as const;
+export const TOOL_VERSION = '0.1.0-rc.1' as const;
 
 export type JsonReportType = 'component' | 'project';
 
