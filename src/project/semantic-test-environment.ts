@@ -17,6 +17,11 @@ export interface RenderEvidence {
 
 const unknown: ResolvedValue = { known: false };
 
+type PropPresence =
+  | { kind: 'absent' }
+  | { kind: 'known'; value: SemanticPrimitive }
+  | { kind: 'unknown' };
+
 export function unwrapExpression(expression: ts.Expression): ts.Expression {
   let current = expression;
   while (
@@ -205,6 +210,43 @@ export function resolveRenderedProp(
   return resolved;
 }
 
+function jsxPropPresence(
+  element: ts.JsxOpeningLikeElement,
+  prop: string,
+  env: TestEnvironment,
+): PropPresence {
+  let result: PropPresence = { kind: 'absent' };
+  for (const property of element.attributes.properties) {
+    if (ts.isJsxSpreadAttribute(property)) {
+      if (!ts.isIdentifier(property.expression)) {
+        result = { kind: 'unknown' };
+        continue;
+      }
+      const object = env.objects.get(property.expression.text);
+      if (!object) {
+        result = { kind: 'unknown' };
+        continue;
+      }
+      const value = objectValue(object, prop, env);
+      result = value.known
+        ? { kind: 'known', value: value.value }
+        : { kind: 'unknown' };
+      continue;
+    }
+    if (
+      ts.isJsxAttribute(property) &&
+      ts.isIdentifier(property.name) &&
+      property.name.text === prop
+    ) {
+      const value = jsxValue(property, env);
+      result = value.known
+        ? { kind: 'known', value: value.value }
+        : { kind: 'unknown' };
+    }
+  }
+  return result;
+}
+
 function matchingElement(root: ts.Node, componentName: string): ts.JsxOpeningLikeElement | undefined {
   let match: ts.JsxOpeningLikeElement | undefined;
   const visit = (node: ts.Node): void => {
@@ -221,6 +263,151 @@ function matchingElement(root: ts.Node, componentName: string): ts.JsxOpeningLik
   };
   visit(root);
   return match;
+}
+
+function renderedOpeningElement(expression: ts.Expression): ts.JsxOpeningLikeElement | undefined {
+  const current = unwrapExpression(expression);
+  if (ts.isJsxSelfClosingElement(current)) return current;
+  return ts.isJsxElement(current) ? current.openingElement : undefined;
+}
+
+interface LocalWrapper {
+  body: ts.Node;
+  propsParameter?: string;
+}
+
+function wrapperFromFunction(
+  fn: ts.FunctionDeclaration | ts.ArrowFunction | ts.FunctionExpression,
+): LocalWrapper | undefined {
+  const body = ts.isFunctionDeclaration(fn) ? fn.body : fn.body;
+  if (!body) return undefined;
+  const parameter = fn.parameters[0];
+  return {
+    body,
+    propsParameter: parameter && ts.isIdentifier(parameter.name)
+      ? parameter.name.text
+      : undefined,
+  };
+}
+
+function wrapperFromVariableStatement(
+  statement: ts.VariableStatement,
+  name: string,
+): LocalWrapper | undefined {
+  for (const declaration of statement.declarationList.declarations) {
+    if (
+      !ts.isIdentifier(declaration.name) ||
+      declaration.name.text !== name ||
+      !declaration.initializer ||
+      (!ts.isArrowFunction(declaration.initializer) && !ts.isFunctionExpression(declaration.initializer))
+    ) continue;
+    return wrapperFromFunction(declaration.initializer);
+  }
+  return undefined;
+}
+
+function localWrapper(anchor: ts.Node, name: string): LocalWrapper | undefined {
+  let child: ts.Node = anchor;
+  let parent: ts.Node | undefined = anchor.parent;
+
+  while (parent) {
+    if (ts.isBlock(parent) || ts.isSourceFile(parent)) {
+      // Function declarations are block-scoped and hoisted, so inspect the whole
+      // nearest lexical container first.
+      for (const statement of parent.statements) {
+        if (
+          ts.isFunctionDeclaration(statement) &&
+          statement.name?.text === name
+        ) {
+          const wrapper = wrapperFromFunction(statement);
+          if (wrapper) return wrapper;
+        }
+      }
+
+      // Const/let wrapper expressions must be declared before the invocation.
+      const boundary = containingStatement(child, parent);
+      for (const statement of parent.statements) {
+        if (boundary && statement === boundary) break;
+        if (!ts.isVariableStatement(statement)) continue;
+        const wrapper = wrapperFromVariableStatement(statement, name);
+        if (wrapper) return wrapper;
+      }
+    }
+    child = parent;
+    parent = parent.parent;
+  }
+  return undefined;
+}
+
+function resolveWrappedProp(
+  element: ts.JsxOpeningLikeElement,
+  prop: string,
+  env: TestEnvironment,
+  wrapperInvocation: ts.JsxOpeningLikeElement,
+  propsParameter?: string,
+): ResolvedValue {
+  let resolved: ResolvedValue = unknown;
+  for (const property of element.attributes.properties) {
+    if (ts.isJsxSpreadAttribute(property)) {
+      if (
+        propsParameter &&
+        ts.isIdentifier(property.expression) &&
+        property.expression.text === propsParameter
+      ) {
+        const outer = jsxPropPresence(wrapperInvocation, prop, env);
+        if (outer.kind === 'known') resolved = { known: true, value: outer.value };
+        else if (outer.kind === 'unknown') resolved = unknown;
+        continue;
+      }
+      if (!ts.isIdentifier(property.expression)) {
+        resolved = unknown;
+        continue;
+      }
+      const object = env.objects.get(property.expression.text);
+      if (!object) {
+        resolved = unknown;
+        continue;
+      }
+      const value = objectValue(object, prop, env);
+      if (value.known) resolved = value;
+      continue;
+    }
+    if (
+      ts.isJsxAttribute(property) &&
+      ts.isIdentifier(property.name) &&
+      property.name.text === prop
+    ) resolved = jsxValue(property, env);
+  }
+  return resolved;
+}
+
+interface WrappedElementMatch {
+  element: ts.JsxOpeningLikeElement;
+  condition: ResolvedValue;
+}
+
+function matchingElementThroughLocalWrapper(
+  renderedExpression: ts.Expression,
+  componentName: string,
+  conditionProp: string,
+  env: TestEnvironment,
+): WrappedElementMatch | undefined {
+  const invocation = renderedOpeningElement(renderedExpression);
+  if (!invocation || !ts.isIdentifier(invocation.tagName)) return undefined;
+  const wrapper = localWrapper(invocation, invocation.tagName.text);
+  if (!wrapper) return undefined;
+  const element = matchingElement(wrapper.body, componentName);
+  if (!element) return undefined;
+  return {
+    element,
+    condition: resolveWrappedProp(
+      element,
+      conditionProp,
+      env,
+      invocation,
+      wrapper.propsParameter,
+    ),
+  };
 }
 
 function containerObject(
@@ -289,27 +476,36 @@ export function findRenderEvidence(
       node.arguments[0]
     ) {
       const element = matchingElement(node.arguments[0], behavior.componentName);
-      if (element) {
-        const condition = resolveRenderedProp(element, behavior.condition.prop, env);
-        if (conditionMatches(condition, behavior.condition.value)) {
-          if (behavior.expectation.type === 'form-controlled-state') {
-            if (condition.known && typeof condition.value === 'string') {
-              const formValue = findFormValue(
-                node.arguments[0],
-                condition.value,
-                behavior.expectation.containers,
-                env,
-              );
-              if (formValue.known) result = { position: node.getStart(), expectedValue: formValue.value };
-            }
-          } else {
-            result = {
-              position: node.getStart(),
-              expectedValue: behavior.condition.value === 'bound' && condition.known
-                ? condition.value
-                : undefined,
-            };
+      const wrapped = element
+        ? undefined
+        : matchingElementThroughLocalWrapper(
+            node.arguments[0],
+            behavior.componentName,
+            behavior.condition.prop,
+            env,
+          );
+      const matchedElement = element ?? wrapped?.element;
+      const condition = element
+        ? resolveRenderedProp(element, behavior.condition.prop, env)
+        : wrapped?.condition ?? unknown;
+      if (matchedElement && conditionMatches(condition, behavior.condition.value)) {
+        if (behavior.expectation.type === 'form-controlled-state') {
+          if (condition.known && typeof condition.value === 'string') {
+            const formValue = findFormValue(
+              node.arguments[0],
+              condition.value,
+              behavior.expectation.containers,
+              env,
+            );
+            if (formValue.known) result = { position: node.getStart(), expectedValue: formValue.value };
           }
+        } else {
+          result = {
+            position: node.getStart(),
+            expectedValue: behavior.condition.value === 'bound' && condition.known
+              ? condition.value
+              : undefined,
+          };
         }
       }
     }

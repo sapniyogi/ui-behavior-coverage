@@ -1,9 +1,11 @@
 import ts from 'typescript';
 import type { BehaviorContract, BehaviorExpectation } from '../core/model';
+import { dedupeBehaviorContracts } from '../core/behavior-identity';
 import { materialUiBehaviorProvider } from '../providers/material-ui';
 import { materialUiCompositionProvider } from '../providers/material-ui-composition';
 import { nativeHtmlBehaviorProvider } from '../providers/native-html';
 import type { BehaviorProvider } from '../providers/types';
+import { attachBehaviorTargets } from './behavior-target';
 
 export const defaultBehaviorProviders: readonly BehaviorProvider[] = [
   nativeHtmlBehaviorProvider,
@@ -79,5 +81,9 @@ export function extractComponentBehaviors(
     }
   }
 
-  return merged;
+  return attachBehaviorTargets(
+    sourceText,
+    fileName,
+    dedupeBehaviorContracts(merged),
+  );
 }

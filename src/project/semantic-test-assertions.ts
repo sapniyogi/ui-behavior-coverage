@@ -7,44 +7,25 @@ import {
   type RenderEvidence,
   type TestEnvironment,
 } from './semantic-test-environment';
+import {
+  collectQueryBindings,
+  queryTargetCorrelates,
+  queryTargetFromExpression,
+  type QueryTarget,
+} from '../react/test-target';
 
-interface QueryBinding { variable: string; role?: string; }
-interface ExpectTarget { variable?: string; property?: string; role?: string; inlineQuery: boolean; negated: boolean; }
-
-function queryRole(call: ts.CallExpression): string | undefined {
-  if (!ts.isPropertyAccessExpression(call.expression)) return undefined;
-  if (!/^(?:get|query|find)(?:All)?ByRole$/.test(call.expression.name.text)) return undefined;
-  const first = call.arguments[0];
-  return first && ts.isStringLiteralLike(first) ? first.text : undefined;
+interface ExpectTarget {
+  variable?: string;
+  property?: string;
+  query?: QueryTarget;
+  inlineQuery: boolean;
+  negated: boolean;
 }
 
-function isDomQuery(call: ts.CallExpression): boolean {
-  return ts.isPropertyAccessExpression(call.expression) &&
-    /^(?:get|query|find)(?:All)?By(?:Role|LabelText|TestId|Text|DisplayValue)$/.test(call.expression.name.text);
-}
-
-function collectQueryBindings(testBody: ts.Node): Map<string, QueryBinding> {
-  const bindings = new Map<string, QueryBinding>();
-  const visit = (node: ts.Node): void => {
-    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
-      const current = unwrapExpression(node.initializer);
-      if (ts.isCallExpression(current) && isDomQuery(current)) {
-        bindings.set(node.name.text, { variable: node.name.text, role: queryRole(current) });
-      }
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(testBody);
-  return bindings;
-}
-
-function rootIdentifier(expression: ts.Expression): string | undefined {
-  let current = expression;
-  while (ts.isPropertyAccessExpression(current)) current = current.expression;
-  return ts.isIdentifier(current) ? current.text : undefined;
-}
-
-function inspectExpect(expression: ts.Expression, bindings: Map<string, QueryBinding>): ExpectTarget {
+function inspectExpect(
+  expression: ts.Expression,
+  bindings: ReadonlyMap<string, QueryTarget>,
+): ExpectTarget {
   let current = expression;
   let negated = false;
   while (ts.isPropertyAccessExpression(current)) {
@@ -58,15 +39,26 @@ function inspectExpect(expression: ts.Expression, bindings: Map<string, QueryBin
   if (!raw) return { inlineQuery: false, negated };
   const target = unwrapExpression(raw);
   if (ts.isIdentifier(target)) {
-    const binding = bindings.get(target.text);
-    return { variable: target.text, role: binding?.role, inlineQuery: false, negated };
+    return {
+      variable: target.text,
+      query: bindings.get(target.text),
+      inlineQuery: false,
+      negated,
+    };
   }
   if (ts.isPropertyAccessExpression(target)) {
-    const variable = rootIdentifier(target);
-    return { variable, property: target.name.text, role: variable ? bindings.get(variable)?.role : undefined, inlineQuery: false, negated };
+    return {
+      property: target.name.text,
+      query: queryTargetFromExpression(target, bindings),
+      inlineQuery: !ts.isIdentifier(target.expression),
+      negated,
+    };
   }
-  if (ts.isCallExpression(target) && isDomQuery(target)) return { role: queryRole(target), inlineQuery: true, negated };
-  return { inlineQuery: false, negated };
+  return {
+    query: queryTargetFromExpression(target, bindings),
+    inlineQuery: true,
+    negated,
+  };
 }
 
 function roleCompatible(role: string | undefined, state: 'disabled' | 'checked'): boolean {
@@ -80,23 +72,41 @@ function samePrimitive(a: SemanticPrimitive | undefined, b: SemanticPrimitive | 
   return a !== undefined && b !== undefined && a === b;
 }
 
+function targetCorrelates(
+  target: ExpectTarget,
+  behavior: RenderStateBehaviorContract,
+  evidence: RenderEvidence,
+): boolean {
+  if (!behavior.target) return true;
+  const expectation = behavior.expectation;
+  const dynamicAccessibleName =
+    expectation.type === 'element-attribute-state' &&
+    expectation.attribute === 'aria-label' &&
+    evidence.expectedValue !== undefined
+      ? String(evidence.expectedValue)
+      : undefined;
+  return queryTargetCorrelates(target.query, behavior.target, dynamicAccessibleName);
+}
+
 function assertionMatches(
   call: ts.CallExpression,
   behavior: RenderStateBehaviorContract,
   evidence: RenderEvidence,
-  bindings: Map<string, QueryBinding>,
+  bindings: ReadonlyMap<string, QueryTarget>,
   env: TestEnvironment,
 ): boolean {
   if (!ts.isPropertyAccessExpression(call.expression)) return false;
   const matcher = call.expression.name.text;
   const target = inspectExpect(call.expression.expression, bindings);
   if (target.variable && !bindings.has(target.variable)) return false;
+  if (!targetCorrelates(target, behavior, evidence)) return false;
+
   const arg0 = primitiveValue(call.arguments[0], env.values);
   const arg1 = primitiveValue(call.arguments[1], env.values);
   const expectation = behavior.expectation;
 
   if (expectation.type === 'element-boolean-state') {
-    if (!roleCompatible(target.role, expectation.state)) return false;
+    if (!behavior.target && !roleCompatible(target.query?.role, expectation.state)) return false;
     if (target.property === expectation.state && (matcher === 'toBe' || matcher === 'toEqual')) {
       return arg0.known && arg0.value === expectation.value && !target.negated;
     }

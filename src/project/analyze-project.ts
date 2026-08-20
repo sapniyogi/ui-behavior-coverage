@@ -1,9 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import type { AnalysisReport, ProjectAnalysisReport } from '../core/model';
+import { dedupeBehaviorContracts } from '../core/behavior-identity';
 import { calculateScores } from '../core/scoring';
 import { extractDirectMaterialUiTestBehaviors } from '../providers/material-ui';
 import { analyzeTestsAgainstBehaviors } from '../react/analyze-tests-target-aware';
+import { attachBehaviorTargets } from '../react/behavior-target';
 import { normalizeTestHarnessSource } from '../react/normalize-test-harness';
 import { analyzeRenderStateTests } from './analyze-render-state-tests';
 import { resolveProjectComponentBehaviors } from './compose-project-behaviors';
@@ -34,6 +36,7 @@ export function analyzeProject(
     for (const testFile of target.testFiles) uniqueTests.add(testFile);
 
     const componentFile = relativePath(root, target.componentFile);
+    const componentSource = readFileSync(target.componentFile, 'utf8');
     const testFiles = target.testFiles.map((file) => relativePath(root, file));
     const rawTestSource = target.testFiles
       .map((file) => `\n// ---- ${relativePath(root, file)} ----\n${readFileSync(file, 'utf8')}`)
@@ -46,18 +49,26 @@ export function analyzeProject(
       maxDepth: options.maxCompositionDepth,
     };
 
-    const callbackBehaviors = resolveProjectComponentBehaviors({
-      rootDir: root,
-      componentFile: target.componentFile,
-      componentNames: target.componentNames,
-      options: compositionOptions,
-    });
-    const renderStateBehaviors = resolveProjectRenderStateBehaviors({
-      rootDir: root,
-      componentFile: target.componentFile,
-      componentNames: target.componentNames,
-      options: compositionOptions,
-    });
+    const callbackBehaviors = attachBehaviorTargets(
+      componentSource,
+      componentFile,
+      dedupeBehaviorContracts(resolveProjectComponentBehaviors({
+        rootDir: root,
+        componentFile: target.componentFile,
+        componentNames: target.componentNames,
+        options: compositionOptions,
+      })),
+    );
+    const renderStateBehaviors = attachBehaviorTargets(
+      componentSource,
+      componentFile,
+      dedupeBehaviorContracts(resolveProjectRenderStateBehaviors({
+        rootDir: root,
+        componentFile: target.componentFile,
+        componentNames: target.componentNames,
+        options: compositionOptions,
+      })),
+    );
 
     const results = [
       ...analyzeTestsAgainstBehaviors(testSource, callbackBehaviors, testFiles.join(', ')),
@@ -78,8 +89,15 @@ export function analyzeProject(
       renderHelpers: options.renderHelpers,
     });
     const relativeTestFile = relativePath(root, testFile);
-    const behaviors = extractDirectMaterialUiTestBehaviors(testSource, relativeTestFile);
-    if (behaviors.length === 0) continue;
+    const rawBehaviors = dedupeBehaviorContracts(
+      extractDirectMaterialUiTestBehaviors(testSource, relativeTestFile),
+    );
+    if (rawBehaviors.length === 0) continue;
+    const behaviors = attachBehaviorTargets(
+      testSource,
+      relativeTestFile,
+      rawBehaviors,
+    );
 
     uniqueTests.add(testFile);
     const results = analyzeTestsAgainstBehaviors(testSource, behaviors, relativeTestFile);

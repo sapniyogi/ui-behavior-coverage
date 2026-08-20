@@ -4,12 +4,13 @@ import type {
   BehaviorStatus,
   RenderStateBehaviorContract,
 } from '../core/model';
+import { dedupeBehaviorContracts } from '../core/behavior-identity';
 import {
   collectLexicalTestEnvironment,
-  findRenderEvidence,
   type RenderEvidence,
   type TestEnvironment,
 } from './semantic-test-environment';
+import { findSafeRenderEvidence } from './safe-render-evidence';
 import { findVerificationPosition } from './semantic-test-assertions';
 
 interface TestCase {
@@ -98,7 +99,7 @@ function resultForTest(
   testCase: TestCase,
   behavior: RenderStateBehaviorContract,
 ): BehaviorResult | undefined {
-  const rendered = findRenderEvidence(testCase.body, behavior, testCase.environment);
+  const rendered = findSafeRenderEvidence(testCase.body, behavior, testCase.environment);
   if (!rendered) return undefined;
 
   const verifiedAt = findVerificationPosition(
@@ -112,7 +113,7 @@ function resultForTest(
       behavior,
       status: 'verified',
       testName: testCase.name,
-      reason: `The test reaches ${conditionText(behavior)} and explicitly verifies ${expectationText(behavior, rendered)}.`,
+      reason: `The test reaches ${conditionText(behavior)} and explicitly verifies ${expectationText(behavior, rendered)} on the correlated contract element.`,
     };
   }
 
@@ -120,7 +121,7 @@ function resultForTest(
     behavior,
     status: 'exercised',
     testName: testCase.name,
-    reason: `The test reaches ${conditionText(behavior)}, but never explicitly verifies ${expectationText(behavior, rendered)}.`,
+    reason: `The test reaches ${conditionText(behavior)}, but never explicitly verifies ${expectationText(behavior, rendered)} on the correlated contract element.`,
     suggestedAssertion: suggestion(behavior),
   };
 }
@@ -144,8 +145,9 @@ export function analyzeRenderStateTests(
     ts.ScriptKind.TSX,
   );
   const tests = collectTestCases(sourceFile);
+  const distinctBehaviors = dedupeBehaviorContracts(behaviors);
 
-  return behaviors.map((behavior) => {
+  return distinctBehaviors.map((behavior) => {
     let strongest: BehaviorResult | undefined;
     for (const testCase of tests) {
       const candidate = resultForTest(testCase, behavior);
@@ -156,7 +158,7 @@ export function analyzeRenderStateTests(
     return strongest ?? {
       behavior,
       status: 'discovered',
-      reason: `No test reaches ${behavior.componentName} with ${conditionText(behavior)} in a resolvable form.`,
+      reason: `No test reaches ${behavior.componentName} with ${conditionText(behavior)} in a control-flow-safe, resolvable form.`,
     };
   });
 }

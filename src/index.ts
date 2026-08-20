@@ -7,6 +7,7 @@ export type {
   BehaviorProviderName,
   BehaviorResult,
   BehaviorStatus,
+  BehaviorTarget,
   BorderRadiusGuidance,
   CoverageScores,
   DesignGuidanceResult,

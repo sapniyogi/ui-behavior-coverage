@@ -43,6 +43,7 @@ interface ComponentLink {
   to: string;
   node: ts.JsxOpeningLikeElement;
   explicit: Map<string, string>;
+  directExplicit: Map<string, string>;
   identitySpreads: PropsObjectBinding[];
   overriddenAfterSpread: Set<string>;
 }
@@ -493,9 +494,15 @@ function inferMuiUsage(
 ): void {
   const callbackName = muiComponent === 'Button' ? 'onClick' : 'onChange';
   const callbackExpression = publicAttributeExpression(node, callbackName);
+  const spreadForwardsCallback = !callbackExpression && spreadForwardsProp(node, context, callbackName);
   const callbackProp = callbackExpression
     ? publicCallback(callbackExpression, context)
-    : spreadForwardsProp(node, context, callbackName)
+    : spreadForwardsCallback
+      ? callbackName
+      : undefined;
+  const directCallbackProp = callbackExpression
+    ? directPublicProp(callbackExpression, context)
+    : spreadForwardsCallback
       ? callbackName
       : undefined;
 
@@ -562,7 +569,7 @@ function inferMuiUsage(
         ? { prop: 'checked', inverted: false }
         : undefined;
 
-    if (checked) {
+    if (checked && directCallbackProp) {
       if (muiComponent === 'Radio') {
         // Radio selection only applies when the underlying radio is currently unchecked.
         // If checked is inverted from a public prop, that corresponds to public=true.
@@ -575,7 +582,7 @@ function inferMuiUsage(
           'mui-radio-checked-select',
           checked.prop,
           outerValueWhenUnchecked,
-          callbackProp,
+          directCallbackProp,
           true,
         );
       } else {
@@ -593,7 +600,7 @@ function inferMuiUsage(
             kind,
             checked.prop,
             outerValue,
-            callbackProp,
+            directCallbackProp,
             nextChecked,
           );
         }
@@ -629,6 +636,7 @@ function buildComponentLink(
   target: string,
 ): ComponentLink {
   const explicit = new Map<string, string>();
+  const directExplicit = new Map<string, string>();
   const identitySpreads = spreadBindings(node, context);
   const overriddenAfterSpread = explicitAttributesAfterLastForwardedSpread(node, context);
 
@@ -638,7 +646,13 @@ function buildComponentLink(
       ? property.initializer.expression
       : undefined;
     if (!expression) continue;
-    const mapped = directPublicProp(expression, context) ?? publicCallback(expression, context);
+    const directMapped = directPublicProp(expression, context);
+    if (directMapped) {
+      explicit.set(property.name.text, directMapped);
+      directExplicit.set(property.name.text, directMapped);
+      continue;
+    }
+    const mapped = publicCallback(expression, context);
     if (mapped) explicit.set(property.name.text, mapped);
   }
 
@@ -647,6 +661,7 @@ function buildComponentLink(
     to: target,
     node,
     explicit,
+    directExplicit,
     identitySpreads,
     overriddenAfterSpread,
   };
@@ -654,6 +669,13 @@ function buildComponentLink(
 
 function mappedProp(link: ComponentLink, prop: string): string | undefined {
   const explicit = link.explicit.get(prop);
+  if (explicit) return explicit;
+  if (link.overriddenAfterSpread.has(prop)) return undefined;
+  return link.identitySpreads.some((binding) => !binding.excluded.has(prop)) ? prop : undefined;
+}
+
+function mappedDirectProp(link: ComponentLink, prop: string): string | undefined {
+  const explicit = link.directExplicit.get(prop);
   if (explicit) return explicit;
   if (link.overriddenAfterSpread.has(prop)) return undefined;
   return link.identitySpreads.some((binding) => !binding.excluded.has(prop)) ? prop : undefined;
@@ -675,7 +697,9 @@ function remapBehavior(
   link: ComponentLink,
 ): BehaviorContract | undefined {
   const conditionProp = mappedProp(link, behavior.condition.prop);
-  const callbackProp = mappedProp(link, behavior.expectation.callbackProp);
+  const callbackProp = behavior.expectation.type === 'callback-event-boolean'
+    ? mappedDirectProp(link, behavior.expectation.callbackProp)
+    : mappedProp(link, behavior.expectation.callbackProp);
   if (!conditionProp || !callbackProp) return undefined;
 
   return {

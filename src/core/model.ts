@@ -52,6 +52,22 @@ export interface SourceEvidence {
   snippet: string;
 }
 
+/**
+ * Conservative identity hints for the concrete element governed by a behavior.
+ * They are intentionally optional because some composed/dynamic elements cannot
+ * be identified statically. Verification must not infer identity from a role
+ * alone when a behavior has target metadata but the target remains ambiguous.
+ */
+export interface BehaviorTarget {
+  roles?: readonly string[];
+  accessibleName?: string;
+  testId?: string | readonly string[];
+  /** Number of same-family candidate elements in the governing component. */
+  candidateCount?: number;
+  /** JSX tag at the source evidence location, useful for diagnostics only. */
+  sourceTag?: string;
+}
+
 export type SemanticPrimitive = string | number | boolean;
 
 export type BehaviorCondition = {
@@ -74,6 +90,7 @@ export interface BehaviorContract {
   event: { handlerProp: string; eventName: string };
   expectation: BehaviorExpectation;
   evidence: SourceEvidence;
+  target?: BehaviorTarget;
 }
 
 type RenderStateExpectationCore =
@@ -107,6 +124,7 @@ export interface RenderStateBehaviorContract {
   event: { eventName: 'render' };
   expectation: RenderStateExpectation;
   evidence: SourceEvidence;
+  target?: BehaviorTarget;
 }
 
 export type AnyBehaviorContract = BehaviorContract | RenderStateBehaviorContract;
