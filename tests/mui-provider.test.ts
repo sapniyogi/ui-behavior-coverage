@@ -65,6 +65,70 @@ test('MUI Checkbox provider emits disabled suppression and both controlled toggl
   assert.ok(toggles.some((behavior) => behavior.condition.value === true));
 });
 
+test('MUI callback-event-boolean requires a directly bound public callback', () => {
+  const source = `
+    import { Checkbox } from '@mui/material';
+
+    export function ReactionOption({ active, handleToggle }) {
+      function handleChange() {
+        handleToggle({ active: !active });
+      }
+
+      return <Checkbox checked={active} onChange={handleChange} />;
+    }
+  `;
+
+  const behaviors = extractComponentBehaviors(source, 'ReactionOption.tsx');
+  const payloadContracts = behaviors.filter(
+    (behavior) => behavior.expectation.type === 'callback-event-boolean',
+  );
+
+  assert.equal(payloadContracts.length, 0);
+});
+
+test('MUI callback-event-boolean preserves a renamed direct public callback binding', () => {
+  const source = `
+    import { Checkbox } from '@mui/material';
+
+    export function ToggleOption({ active, onToggle: handleToggle }) {
+      return <Checkbox checked={active} onChange={handleToggle} />;
+    }
+  `;
+
+  const behaviors = extractComponentBehaviors(source, 'ToggleOption.tsx');
+  const toggles = behaviors.filter((behavior) => behavior.kind === 'mui-checkbox-checked-toggle');
+
+  assert.equal(toggles.length, 2);
+  assert.ok(toggles.every((behavior) => behavior.expectation.callbackProp === 'onToggle'));
+});
+
+test('composed callback-event-boolean is not forwarded through a payload-transforming wrapper', () => {
+  const source = `
+    import { Checkbox } from '@mui/material';
+
+    function ToggleControl({ active, onChange }) {
+      return <Checkbox checked={active} onChange={onChange} />;
+    }
+
+    export function WrappedToggle({ active, onToggle }) {
+      function handleChange() {
+        onToggle({ active: !active });
+      }
+
+      return <ToggleControl active={active} onChange={handleChange} />;
+    }
+  `;
+
+  const behaviors = extractComponentBehaviors(source, 'WrappedToggle.tsx');
+  const wrappedPayloadContracts = behaviors.filter(
+    (behavior) =>
+      behavior.componentName === 'WrappedToggle' &&
+      behavior.expectation.type === 'callback-event-boolean',
+  );
+
+  assert.equal(wrappedPayloadContracts.length, 0);
+});
+
 test('MUI Checkbox callback-called-only assertion remains EXERCISED', () => {
   const behavior = extractComponentBehaviors(muiCheckboxWrapper)
     .find((candidate) => candidate.kind === 'mui-checkbox-checked-toggle' && candidate.condition.value === false);

@@ -10,6 +10,43 @@ import {
   readAttributeValue,
 } from './shared';
 
+type FunctionNode = ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction;
+
+interface DirectComponentContext {
+  name: string;
+  localToPublicProp: Map<string, string>;
+}
+
+function directComponentContext(node: ts.Node): DirectComponentContext | undefined {
+  const name = componentNameForNode(node);
+  if (!name || !/^[A-Z]/.test(name)) return undefined;
+  if (!ts.isFunctionDeclaration(node) && !ts.isFunctionExpression(node) && !ts.isArrowFunction(node)) {
+    return undefined;
+  }
+
+  const localToPublicProp = new Map<string, string>();
+  const parameter = node.parameters[0];
+  if (parameter && ts.isObjectBindingPattern(parameter.name)) {
+    for (const element of parameter.name.elements) {
+      if (element.dotDotDotToken || !ts.isIdentifier(element.name)) continue;
+      const propertyName = element.propertyName;
+      const publicName = propertyName && (ts.isIdentifier(propertyName) || ts.isStringLiteralLike(propertyName))
+        ? propertyName.text
+        : element.name.text;
+      localToPublicProp.set(element.name.text, publicName);
+    }
+  }
+
+  return { name, localToPublicProp };
+}
+
+function directPublicBinding(
+  context: DirectComponentContext | undefined,
+  localName: string | undefined,
+): string | undefined {
+  return context && localName ? context.localToPublicProp.get(localName) : undefined;
+}
+
 type SupportedMuiComponent =
   | 'Button'
   | 'Checkbox'
@@ -210,8 +247,9 @@ export const materialUiBehaviorProvider: BehaviorProvider = {
 
     const behaviors: BehaviorContract[] = [];
 
-    const visit = (node: ts.Node, currentComponent?: string): void => {
-      const componentName = componentNameForNode(node) ?? currentComponent;
+    const visit = (node: ts.Node, currentComponent?: DirectComponentContext): void => {
+      const component = directComponentContext(node) ?? currentComponent;
+      const componentName = component?.name;
 
       if (componentName && (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node))) {
         const localTag = jsxTagName(node);
@@ -266,15 +304,17 @@ export const materialUiBehaviorProvider: BehaviorProvider = {
               );
             }
             const checked = identifierAttribute(node, 'checked');
-            if (checked) {
+            const checkedProp = directPublicBinding(component, checked);
+            const callbackProp = directPublicBinding(component, onChange);
+            if (checkedProp && callbackProp) {
               pushToggleBehaviors(
                 behaviors,
                 sourceFile,
                 node,
                 componentName,
                 muiComponent === 'Checkbox' ? 'mui-checkbox-checked-toggle' : 'mui-switch-checked-toggle',
-                checked,
-                onChange,
+                checkedProp,
+                callbackProp,
               );
             }
           }
@@ -295,7 +335,9 @@ export const materialUiBehaviorProvider: BehaviorProvider = {
               );
             }
             const checked = identifierAttribute(node, 'checked');
-            if (checked) {
+            const checkedProp = directPublicBinding(component, checked);
+            const callbackProp = directPublicBinding(component, onChange);
+            if (checkedProp && callbackProp) {
               // A radio is selected by clicking an unchecked option; clicking a checked radio
               // does not toggle it off, so only the false -> true direction is inferred.
               pushBooleanStateBehavior(
@@ -304,8 +346,8 @@ export const materialUiBehaviorProvider: BehaviorProvider = {
                 node,
                 componentName,
                 'mui-radio-checked-select',
-                checked,
-                onChange,
+                checkedProp,
+                callbackProp,
                 false,
                 true,
               );
@@ -344,7 +386,7 @@ export const materialUiBehaviorProvider: BehaviorProvider = {
         }
       }
 
-      ts.forEachChild(node, (child) => visit(child, componentName));
+      ts.forEachChild(node, (child) => visit(child, component));
     };
 
     visit(sourceFile);
