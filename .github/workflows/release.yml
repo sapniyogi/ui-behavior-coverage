@@ -291,7 +291,7 @@ jobs:
           echo
           tar -tzf "$TARBALL"
 
-          if ! tar -tzf "$TARBALL" | grep -qx 'package/README.md'; then
+          if ! tar -tzf "$TARBALL" package/README.md >/dev/null 2>&1; then
             echo "::error::Release tarball does not contain package/README.md."
             exit 1
           fi
