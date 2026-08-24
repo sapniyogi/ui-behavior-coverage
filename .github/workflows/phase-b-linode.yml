@@ -8,13 +8,24 @@ on:
       - .github/workflows/phase-b-linode.yml
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: phase-b-linode-rc1
+  cancel-in-progress: true
 
 jobs:
   inventory:
     name: Inventory pinned Linode surface
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout evaluation branch
+        uses: actions/checkout@v4
+        with:
+          ref: phase-b/rc1-empirical-validation
+          path: evaluator
+          fetch-depth: 0
+
       - name: Checkout pinned target
         uses: actions/checkout@v4
         with:
@@ -34,7 +45,6 @@ jobs:
             exit 1
           fi
 
-          mkdir -p phase-b-output
           python3 <<'PY'
           import json
           from collections import Counter
@@ -81,9 +91,11 @@ jobs:
           )
 
           inventory = {
+              "phase": "B — RC.1 empirical validation",
               "repository": "linode/apl-console",
               "scope": "src",
               "upstreamSha": "961e3a24fc9fa5ee3294370f9a25dbf911a4ec01",
+              "inventoryCompletedBeforeAnalyzerInstall": True,
               "counts": {
                   "allFiles": len(all_files),
                   "codeFiles": len(code_files),
@@ -104,9 +116,12 @@ jobs:
               "rjsfImportFiles": rel(rjsf_files),
           }
 
-          out = Path("phase-b-output/inventory.json")
+          out = Path("evaluator/docs/evaluations/2026-08-23-phase-b-linode-inventory.json")
+          out.parent.mkdir(parents=True, exist_ok=True)
           out.write_text(json.dumps(inventory, indent=2) + "\n", encoding="utf-8")
-          print(json.dumps(inventory["counts"], indent=2))
+          print("PHASE_B_INVENTORY_START")
+          print(json.dumps(inventory, indent=2))
+          print("PHASE_B_INVENTORY_END")
 
           with open(Path.home() / "inventory-summary.md", "w", encoding="utf-8") as f:
               f.write("## Linode Phase B inventory\n\n")
@@ -116,13 +131,27 @@ jobs:
           PY
 
           cat "$HOME/inventory-summary.md" >> "$GITHUB_STEP_SUMMARY"
-          cat phase-b-output/inventory.json
+
+      - name: Persist inventory before analysis
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd evaluator
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/evaluations/2026-08-23-phase-b-linode-inventory.json
+          if git diff --cached --quiet; then
+            echo "Inventory evidence is already current."
+          else
+            git commit -m "Record Phase B Linode inventory"
+            git push origin HEAD:phase-b/rc1-empirical-validation
+          fi
 
       - name: Upload inventory artifact
         uses: actions/upload-artifact@v4
         with:
           name: phase-b-linode-inventory
-          path: phase-b-output/inventory.json
+          path: evaluator/docs/evaluations/2026-08-23-phase-b-linode-inventory.json
           if-no-files-found: error
           retention-days: 90
 
@@ -131,6 +160,20 @@ jobs:
     needs: inventory
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout evaluation branch after inventory
+        uses: actions/checkout@v4
+        with:
+          ref: phase-b/rc1-empirical-validation
+          path: evaluator
+          fetch-depth: 0
+
+      - name: Require persisted inventory evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s evaluator/docs/evaluations/2026-08-23-phase-b-linode-inventory.json
+          node -e "const x=require('./evaluator/docs/evaluations/2026-08-23-phase-b-linode-inventory.json'); if (!x.inventoryCompletedBeforeAnalyzerInstall || x.upstreamSha !== '961e3a24fc9fa5ee3294370f9a25dbf911a4ec01') process.exit(1); console.log('Persisted inventory evidence verified.');"
+
       - name: Checkout same pinned target
         uses: actions/checkout@v4
         with:
@@ -181,17 +224,33 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p phase-b-output
+          REPORT="evaluator/docs/evaluations/2026-08-23-phase-b-linode-rc1.json"
+          SUMMARY="evaluator/docs/evaluations/2026-08-23-phase-b-linode-rc1-summary.json"
+
           "$GITHUB_WORKSPACE/runner/node_modules/.bin/ui-behavior-coverage" \
             scan "$GITHUB_WORKSPACE/target/src" \
-            --json > phase-b-output/report.json
+            --json > "$REPORT"
 
           node <<'NODE'
           const fs = require('node:fs');
-          const result = JSON.parse(fs.readFileSync('phase-b-output/report.json', 'utf8'));
+          const reportPath = 'evaluator/docs/evaluations/2026-08-23-phase-b-linode-rc1.json';
+          const summaryPath = 'evaluator/docs/evaluations/2026-08-23-phase-b-linode-rc1-summary.json';
+          const result = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+          if (result.toolVersion !== '0.1.0-rc.1') {
+            throw new Error(`Report toolVersion '${result.toolVersion}' is not 0.1.0-rc.1`);
+          }
           const summary = result.summary ?? result.report?.summary ?? {};
           const discovery = result.report?.discovery ?? result.discovery ?? null;
           const compact = {
+            phase: 'B — RC.1 empirical validation',
+            repository: 'linode/apl-console',
+            scope: 'src',
+            upstreamSha: '961e3a24fc9fa5ee3294370f9a25dbf911a4ec01',
+            analyzer: {
+              package: 'ui-behavior-coverage',
+              version: '0.1.0-rc.1',
+              source: 'published npm package',
+            },
             schemaVersion: result.schemaVersion,
             toolVersion: result.toolVersion,
             summary,
@@ -200,11 +259,7 @@ jobs:
           console.log('PHASE_B_RESULT_START');
           console.log(JSON.stringify(compact, null, 2));
           console.log('PHASE_B_RESULT_END');
-
-          fs.writeFileSync(
-            'phase-b-output/summary.json',
-            JSON.stringify(compact, null, 2) + '\n',
-          );
+          fs.writeFileSync(summaryPath, JSON.stringify(compact, null, 2) + '\n');
 
           fs.appendFileSync(
             process.env.GITHUB_STEP_SUMMARY,
@@ -220,12 +275,30 @@ jobs:
           );
           NODE
 
+      - name: Persist published-package analysis evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd evaluator
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --ff-only origin phase-b/rc1-empirical-validation
+          git add \
+            docs/evaluations/2026-08-23-phase-b-linode-rc1.json \
+            docs/evaluations/2026-08-23-phase-b-linode-rc1-summary.json
+          if git diff --cached --quiet; then
+            echo "Analysis evidence is already current."
+          else
+            git commit -m "Record published RC.1 Linode evaluation"
+            git push origin HEAD:phase-b/rc1-empirical-validation
+          fi
+
       - name: Upload RC.1 analysis artifacts
         uses: actions/upload-artifact@v4
         with:
           name: phase-b-linode-rc1
           path: |
-            phase-b-output/report.json
-            phase-b-output/summary.json
+            evaluator/docs/evaluations/2026-08-23-phase-b-linode-rc1.json
+            evaluator/docs/evaluations/2026-08-23-phase-b-linode-rc1-summary.json
           if-no-files-found: error
           retention-days: 90
