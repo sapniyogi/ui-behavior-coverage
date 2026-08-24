@@ -1,0 +1,9 @@
+{
+  "candidateCommit": "7ce7e417ed6d0decdc26a816cd34eedfeea9856e",
+  "checkStatus": 2,
+  "testStatus": 2,
+  "targetPinStatus": -1,
+  "analyzerStatus": -1,
+  "parseStatus": -1,
+  "finalStatus": "failed"
+}
