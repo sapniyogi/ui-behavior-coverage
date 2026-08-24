@@ -103,6 +103,7 @@ function callIsUnconditional(call: ts.CallExpression, body: ts.Node): boolean {
 }
 
 function renderCallSummary(fn: FunctionNode): { total: number; safe: number } {
+  if (!fn.body) return { total: 0, safe: 0 };
   let total = 0;
   let safe = 0;
   const root = fn.body;
@@ -134,6 +135,7 @@ function inlineHelperCall(
   call: ts.CallExpression,
   fn: FunctionNode,
 ): string | undefined {
+  if (!fn.body) return undefined;
   const summary = renderCallSummary(fn);
   if (summary.total !== 1 || summary.safe !== 1) return undefined;
   if (call.arguments.some((argument) => ts.isSpreadElement(argument))) return undefined;
