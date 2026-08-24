@@ -1,0 +1,231 @@
+name: Phase B - Linode RC.1 evaluation
+
+on:
+  push:
+    branches:
+      - phase-b/rc1-empirical-validation
+    paths:
+      - .github/workflows/phase-b-linode.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    name: Inventory pinned Linode surface
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout pinned target
+        uses: actions/checkout@v4
+        with:
+          repository: linode/apl-console
+          ref: 961e3a24fc9fa5ee3294370f9a25dbf911a4ec01
+          path: target
+          fetch-depth: 1
+
+      - name: Verify pinned target and inventory source surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXPECTED_SHA="961e3a24fc9fa5ee3294370f9a25dbf911a4ec01"
+          ACTUAL_SHA="$(git -C target rev-parse HEAD)"
+          if [[ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]]; then
+            echo "::error::Target SHA ${ACTUAL_SHA} does not match pinned SHA ${EXPECTED_SHA}."
+            exit 1
+          fi
+
+          mkdir -p phase-b-output
+          python3 <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+
+          root = Path("target/src")
+          if not root.is_dir():
+              raise SystemExit("target/src does not exist")
+
+          all_files = [p for p in root.rglob("*") if p.is_file()]
+          code_suffixes = {".ts", ".tsx", ".js", ".jsx"}
+          code_files = [p for p in all_files if p.suffix.lower() in code_suffixes]
+          tsx_files = [p for p in all_files if p.suffix.lower() == ".tsx"]
+          test_files = [p for p in all_files if ".test." in p.name or ".spec." in p.name]
+          ui_test_files = [p for p in test_files if p.suffix.lower() in {".tsx", ".jsx"}]
+          ts_test_files = [p for p in test_files if p.suffix.lower() == ".ts"]
+
+          def files_containing(token):
+              matches = []
+              for path in code_files:
+                  try:
+                      text = path.read_text(encoding="utf-8")
+                  except UnicodeDecodeError:
+                      continue
+                  if token in text:
+                      matches.append(path)
+              return matches
+
+          mui_files = files_containing("@mui/")
+          rtl_files = files_containing("@testing-library/")
+          rhf_files = files_containing("react-hook-form")
+          rjsf_files = files_containing("@rjsf/")
+
+          def rel(paths):
+              return sorted(str(p.relative_to(Path("target"))) for p in paths)
+
+          top_level_tsx = Counter(
+              p.relative_to(root).parts[0] if len(p.relative_to(root).parts) > 1 else "(src root)"
+              for p in tsx_files
+          )
+          top_level_tests = Counter(
+              p.relative_to(root).parts[0] if len(p.relative_to(root).parts) > 1 else "(src root)"
+              for p in test_files
+          )
+
+          inventory = {
+              "repository": "linode/apl-console",
+              "scope": "src",
+              "upstreamSha": "961e3a24fc9fa5ee3294370f9a25dbf911a4ec01",
+              "counts": {
+                  "allFiles": len(all_files),
+                  "codeFiles": len(code_files),
+                  "tsxFiles": len(tsx_files),
+                  "testFiles": len(test_files),
+                  "uiTestFiles": len(ui_test_files),
+                  "tsTestFiles": len(ts_test_files),
+                  "muiImportFiles": len(mui_files),
+                  "testingLibraryImportFiles": len(rtl_files),
+                  "reactHookFormImportFiles": len(rhf_files),
+                  "rjsfImportFiles": len(rjsf_files),
+              },
+              "tsxByTopLevelArea": dict(sorted(top_level_tsx.items())),
+              "testsByTopLevelArea": dict(sorted(top_level_tests.items())),
+              "uiTestFiles": rel(ui_test_files),
+              "muiImportFiles": rel(mui_files),
+              "reactHookFormImportFiles": rel(rhf_files),
+              "rjsfImportFiles": rel(rjsf_files),
+          }
+
+          out = Path("phase-b-output/inventory.json")
+          out.write_text(json.dumps(inventory, indent=2) + "\n", encoding="utf-8")
+          print(json.dumps(inventory["counts"], indent=2))
+
+          with open(Path.home() / "inventory-summary.md", "w", encoding="utf-8") as f:
+              f.write("## Linode Phase B inventory\n\n")
+              f.write(f"- Pinned SHA: `{inventory['upstreamSha']}`\n")
+              for key, value in inventory["counts"].items():
+                  f.write(f"- {key}: **{value}**\n")
+          PY
+
+          cat "$HOME/inventory-summary.md" >> "$GITHUB_STEP_SUMMARY"
+          cat phase-b-output/inventory.json
+
+      - name: Upload inventory artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-b-linode-inventory
+          path: phase-b-output/inventory.json
+          if-no-files-found: error
+          retention-days: 90
+
+  analyze:
+    name: Run published UBC RC.1
+    needs: inventory
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout same pinned target
+        uses: actions/checkout@v4
+        with:
+          repository: linode/apl-console
+          ref: 961e3a24fc9fa5ee3294370f9a25dbf911a4ec01
+          path: target
+          fetch-depth: 1
+
+      - name: Verify pinned target
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXPECTED_SHA="961e3a24fc9fa5ee3294370f9a25dbf911a4ec01"
+          ACTUAL_SHA="$(git -C target rev-parse HEAD)"
+          test "$ACTUAL_SHA" = "$EXPECTED_SHA"
+          echo "Pinned target verified: $ACTUAL_SHA"
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+          cache: false
+
+      - name: Install exact published UBC RC.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir runner
+          cd runner
+          npm init -y >/dev/null
+          npm install --no-fund --no-audit --save-exact ui-behavior-coverage@0.1.0-rc.1
+
+          node <<'NODE'
+          const pkg = require('ui-behavior-coverage/package.json');
+          const api = require('ui-behavior-coverage');
+          if (pkg.version !== '0.1.0-rc.1') {
+            throw new Error(`Expected npm package 0.1.0-rc.1, got ${pkg.version}`);
+          }
+          if (api.TOOL_VERSION !== '0.1.0-rc.1') {
+            throw new Error(`Expected TOOL_VERSION 0.1.0-rc.1, got ${api.TOOL_VERSION}`);
+          }
+          console.log(`Published package verified: ${pkg.name}@${pkg.version}`);
+          console.log(`TOOL_VERSION verified: ${api.TOOL_VERSION}`);
+          NODE
+
+      - name: Analyze pinned Linode source with published RC.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p phase-b-output
+          "$GITHUB_WORKSPACE/runner/node_modules/.bin/ui-behavior-coverage" \
+            scan "$GITHUB_WORKSPACE/target/src" \
+            --json > phase-b-output/report.json
+
+          node <<'NODE'
+          const fs = require('node:fs');
+          const result = JSON.parse(fs.readFileSync('phase-b-output/report.json', 'utf8'));
+          const summary = result.summary ?? result.report?.summary ?? {};
+          const discovery = result.report?.discovery ?? result.discovery ?? null;
+          const compact = {
+            schemaVersion: result.schemaVersion,
+            toolVersion: result.toolVersion,
+            summary,
+            discovery,
+          };
+          console.log('PHASE_B_RESULT_START');
+          console.log(JSON.stringify(compact, null, 2));
+          console.log('PHASE_B_RESULT_END');
+
+          fs.writeFileSync(
+            'phase-b-output/summary.json',
+            JSON.stringify(compact, null, 2) + '\n',
+          );
+
+          fs.appendFileSync(
+            process.env.GITHUB_STEP_SUMMARY,
+            `## Published RC.1 result\n\n` +
+            `- Package: \`ui-behavior-coverage@${result.toolVersion}\`\n` +
+            `- Target: \`linode/apl-console@961e3a24fc9fa5ee3294370f9a25dbf911a4ec01\`\n` +
+            `- Discovered: **${summary.discovered ?? 'n/a'}**\n` +
+            `- Exercised: **${summary.exercised ?? 'n/a'}**\n` +
+            `- Verified: **${summary.verified ?? 'n/a'}**\n` +
+            `- Behavior Reach: **${summary.behaviorReach ?? 'n/a'}**\n` +
+            `- Behavior Verification: **${summary.behaviorVerification ?? 'n/a'}**\n` +
+            `- Verification Gap: **${summary.verificationGap ?? 'n/a'}**\n`,
+          );
+          NODE
+
+      - name: Upload RC.1 analysis artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-b-linode-rc1
+          path: |
+            phase-b-output/report.json
+            phase-b-output/summary.json
+          if-no-files-found: error
+          retention-days: 90
