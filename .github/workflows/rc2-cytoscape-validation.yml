@@ -1,0 +1,186 @@
+name: RC.2 Cytoscape regression validation
+
+on:
+  push:
+    branches:
+      - agent/rc2-cytoscape-regressions
+    paths:
+      - src/**
+      - tests/cytoscape-regressions.test.ts
+      - .github/workflows/rc2-cytoscape-validation.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rc2-cytoscape-regression-validation
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout candidate branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/rc2-cytoscape-regressions
+          fetch-depth: 0
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run type check and full test command
+        id: tests
+        shell: bash
+        run: |
+          set +e
+          mkdir -p rc2-validation-logs docs/evaluations
+
+          npm run check >rc2-validation-logs/check.log 2>&1
+          CHECK_STATUS=$?
+
+          npm test >rc2-validation-logs/test.log 2>&1
+          TEST_STATUS=$?
+
+          echo "check_status=${CHECK_STATUS}" >> "$GITHUB_OUTPUT"
+          echo "test_status=${TEST_STATUS}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Checkout pinned Cytoscape target
+        if: steps.tests.outputs.check_status == '0' && steps.tests.outputs.test_status == '0'
+        uses: actions/checkout@v4
+        with:
+          repository: cytoscape/cytoscape-web
+          ref: 6bd1e50733155ea9f039457ef89b6c0e9595154a
+          path: target
+          fetch-depth: 1
+
+      - name: Rerun pinned Cytoscape with corrected source candidate
+        id: cytoscape
+        if: steps.tests.outputs.check_status == '0' && steps.tests.outputs.test_status == '0'
+        shell: bash
+        run: |
+          set +e
+          REPORT="docs/evaluations/2026-08-24-phase-b-cytoscape-rc2-candidate.json"
+          SUMMARY="docs/evaluations/2026-08-24-phase-b-cytoscape-rc2-candidate-summary.json"
+
+          test "$(git -C target rev-parse HEAD)" = "6bd1e50733155ea9f039457ef89b6c0e9595154a"
+          PIN_STATUS=$?
+
+          node dist/src/cli/index.js scan "$GITHUB_WORKSPACE/target/src" --json >"$REPORT" 2>rc2-validation-logs/cytoscape-stderr.log
+          ANALYZER_STATUS=$?
+
+          PARSE_STATUS=-1
+          if [[ "$ANALYZER_STATUS" -eq 0 ]]; then
+            node <<'NODE' >rc2-validation-logs/cytoscape-summary.log 2>&1
+          const fs = require('node:fs');
+          const report = JSON.parse(fs.readFileSync('docs/evaluations/2026-08-24-phase-b-cytoscape-rc2-candidate.json', 'utf8'));
+          const compact = {
+            phase: 'B — corrected candidate comparison',
+            repository: 'cytoscape/cytoscape-web',
+            scope: 'src',
+            upstreamSha: '6bd1e50733155ea9f039457ef89b6c0e9595154a',
+            analyzer: {
+              source: 'agent/rc2-cytoscape-regressions',
+              commit: process.env.GITHUB_SHA,
+              reportedToolVersion: report.toolVersion,
+            },
+            summary: report.summary ?? report.report?.summary ?? {},
+            discovery: report.discovery ?? report.report?.discovery ?? null,
+          };
+          fs.writeFileSync(
+            'docs/evaluations/2026-08-24-phase-b-cytoscape-rc2-candidate-summary.json',
+            JSON.stringify(compact, null, 2) + '\n',
+          );
+          console.log(JSON.stringify(compact, null, 2));
+          NODE
+            PARSE_STATUS=$?
+          fi
+
+          echo "pin_status=${PIN_STATUS}" >> "$GITHUB_OUTPUT"
+          echo "analyzer_status=${ANALYZER_STATUS}" >> "$GITHUB_OUTPUT"
+          echo "parse_status=${PARSE_STATUS}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Persist validation evidence
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          CHECK_STATUS="${{ steps.tests.outputs.check_status || '-1' }}"
+          TEST_STATUS="${{ steps.tests.outputs.test_status || '-1' }}"
+          PIN_STATUS="${{ steps.cytoscape.outputs.pin_status || '-1' }}"
+          ANALYZER_STATUS="${{ steps.cytoscape.outputs.analyzer_status || '-1' }}"
+          PARSE_STATUS="${{ steps.cytoscape.outputs.parse_status || '-1' }}"
+
+          if [[ "$CHECK_STATUS" == "0" && "$TEST_STATUS" == "0" && "$PIN_STATUS" == "0" && "$ANALYZER_STATUS" == "0" && "$PARSE_STATUS" == "0" ]]; then
+            FINAL_STATUS="success"
+          else
+            FINAL_STATUS="failed"
+          fi
+
+          cat > docs/evaluations/2026-08-24-rc2-cytoscape-regression-status.json <<EOF
+          {
+            "candidateCommit": "${GITHUB_SHA}",
+            "checkStatus": ${CHECK_STATUS},
+            "testStatus": ${TEST_STATUS},
+            "targetPinStatus": ${PIN_STATUS},
+            "analyzerStatus": ${ANALYZER_STATUS},
+            "parseStatus": ${PARSE_STATUS},
+            "finalStatus": "${FINAL_STATUS}"
+          }
+          EOF
+
+          {
+            echo "# RC.2 Cytoscape regression validation"
+            echo
+            echo "- candidate: \`${GITHUB_SHA}\`"
+            echo "- finalStatus: \`${FINAL_STATUS}\`"
+            echo "- checkStatus: \`${CHECK_STATUS}\`"
+            echo "- testStatus: \`${TEST_STATUS}\`"
+            echo "- targetPinStatus: \`${PIN_STATUS}\`"
+            echo "- analyzerStatus: \`${ANALYZER_STATUS}\`"
+            echo "- parseStatus: \`${PARSE_STATUS}\`"
+            echo
+            echo "## Type-check tail"
+            echo '```text'
+            tail -n 80 rc2-validation-logs/check.log 2>/dev/null || true
+            echo '```'
+            echo
+            echo "## Test tail"
+            echo '```text'
+            tail -n 120 rc2-validation-logs/test.log 2>/dev/null || true
+            echo '```'
+            echo
+            echo "## Cytoscape analyzer stderr tail"
+            echo '```text'
+            tail -n 100 rc2-validation-logs/cytoscape-stderr.log 2>/dev/null || true
+            echo '```'
+            echo
+            echo "## Cytoscape compact summary"
+            echo '```text'
+            cat rc2-validation-logs/cytoscape-summary.log 2>/dev/null || true
+            echo '```'
+          } > docs/evaluations/2026-08-24-rc2-cytoscape-regression-diagnostics.md
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/evaluations/2026-08-24-rc2-cytoscape-regression-status.json
+          git add docs/evaluations/2026-08-24-rc2-cytoscape-regression-diagnostics.md
+          [[ -f docs/evaluations/2026-08-24-phase-b-cytoscape-rc2-candidate.json ]] && git add docs/evaluations/2026-08-24-phase-b-cytoscape-rc2-candidate.json
+          [[ -f docs/evaluations/2026-08-24-phase-b-cytoscape-rc2-candidate-summary.json ]] && git add docs/evaluations/2026-08-24-phase-b-cytoscape-rc2-candidate-summary.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Record RC.2 Cytoscape validation"
+            git push origin HEAD:agent/rc2-cytoscape-regressions
+          fi
+
+          if [[ "$FINAL_STATUS" != "success" ]]; then
+            exit 1
+          fi
