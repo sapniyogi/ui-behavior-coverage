@@ -208,7 +208,10 @@ jobs:
           npm install --no-fund --no-audit --save-exact ui-behavior-coverage@0.1.0-rc.1
 
           node <<'NODE'
-          const pkg = require('ui-behavior-coverage/package.json');
+          const fs = require('node:fs');
+          const pkg = JSON.parse(
+            fs.readFileSync('node_modules/ui-behavior-coverage/package.json', 'utf8'),
+          );
           const api = require('ui-behavior-coverage');
           if (pkg.version !== '0.1.0-rc.1') {
             throw new Error(`Expected npm package 0.1.0-rc.1, got ${pkg.version}`);
