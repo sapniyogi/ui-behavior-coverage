@@ -1,0 +1,328 @@
+name: Phase B - Cytoscape RC.1 evaluation
+
+on:
+  push:
+    branches:
+      - phase-b/rc1-empirical-validation
+    paths:
+      - .github/workflows/phase-b-cytoscape.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase-b-cytoscape-rc1
+  cancel-in-progress: true
+
+jobs:
+  inventory:
+    name: Inventory pinned Cytoscape surface
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout evaluation branch
+        uses: actions/checkout@v4
+        with:
+          ref: phase-b/rc1-empirical-validation
+          path: evaluator
+          fetch-depth: 0
+
+      - name: Checkout pinned target
+        uses: actions/checkout@v4
+        with:
+          repository: cytoscape/cytoscape-web
+          ref: 6bd1e50733155ea9f039457ef89b6c0e9595154a
+          path: target
+          fetch-depth: 1
+
+      - name: Verify pinned target and inventory source surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXPECTED_SHA="6bd1e50733155ea9f039457ef89b6c0e9595154a"
+          ACTUAL_SHA="$(git -C target rev-parse HEAD)"
+          if [[ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]]; then
+            echo "::error::Target SHA ${ACTUAL_SHA} does not match pinned SHA ${EXPECTED_SHA}."
+            exit 1
+          fi
+
+          python3 <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+
+          root = Path("target/src")
+          if not root.is_dir():
+              raise SystemExit("target/src does not exist")
+
+          all_files = [p for p in root.rglob("*") if p.is_file()]
+          code_suffixes = {".ts", ".tsx", ".js", ".jsx"}
+          code_files = [p for p in all_files if p.suffix.lower() in code_suffixes]
+          tsx_files = [p for p in all_files if p.suffix.lower() == ".tsx"]
+          test_files = [p for p in all_files if ".test." in p.name or ".spec." in p.name]
+          ui_test_files = [p for p in test_files if p.suffix.lower() in {".tsx", ".jsx"}]
+          ts_test_files = [p for p in test_files if p.suffix.lower() == ".ts"]
+
+          def files_containing(token):
+              matches = []
+              for path in code_files:
+                  try:
+                      text = path.read_text(encoding="utf-8")
+                  except UnicodeDecodeError:
+                      continue
+                  if token in text:
+                      matches.append(path)
+              return matches
+
+          mui_files = files_containing("@mui/")
+          rtl_files = files_containing("@testing-library/")
+          rhf_files = files_containing("react-hook-form")
+          rjsf_files = files_containing("@rjsf/")
+
+          def rel(paths):
+              return sorted(str(p.relative_to(Path("target"))) for p in paths)
+
+          def area_counts(paths):
+              return dict(sorted(Counter(
+                  p.relative_to(root).parts[0] if len(p.relative_to(root).parts) > 1 else "(src root)"
+                  for p in paths
+              ).items()))
+
+          inventory = {
+              "phase": "B — RC.1 empirical validation",
+              "repository": "cytoscape/cytoscape-web",
+              "scope": "src",
+              "upstreamSha": "6bd1e50733155ea9f039457ef89b6c0e9595154a",
+              "inventoryCompletedBeforeAnalyzerInstall": True,
+              "counts": {
+                  "allFiles": len(all_files),
+                  "codeFiles": len(code_files),
+                  "tsxFiles": len(tsx_files),
+                  "testFiles": len(test_files),
+                  "uiTestFiles": len(ui_test_files),
+                  "tsTestFiles": len(ts_test_files),
+                  "muiImportFiles": len(mui_files),
+                  "testingLibraryImportFiles": len(rtl_files),
+                  "reactHookFormImportFiles": len(rhf_files),
+                  "rjsfImportFiles": len(rjsf_files),
+              },
+              "tsxByTopLevelArea": area_counts(tsx_files),
+              "testsByTopLevelArea": area_counts(test_files),
+              "uiTestFiles": rel(ui_test_files),
+              "muiImportFiles": rel(mui_files),
+              "reactHookFormImportFiles": rel(rhf_files),
+              "rjsfImportFiles": rel(rjsf_files),
+          }
+          out = Path("evaluator/docs/evaluations/2026-08-24-phase-b-cytoscape-inventory.json")
+          out.write_text(json.dumps(inventory, indent=2) + "\n", encoding="utf-8")
+          print(json.dumps(inventory["counts"], indent=2))
+          PY
+
+      - name: Persist inventory before analysis
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd evaluator
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --ff-only origin phase-b/rc1-empirical-validation
+          git add docs/evaluations/2026-08-24-phase-b-cytoscape-inventory.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Record Phase B Cytoscape inventory"
+            git push origin HEAD:phase-b/rc1-empirical-validation
+          fi
+
+  analyze:
+    name: Run published UBC RC.1
+    needs: inventory
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout evaluation branch after inventory
+        uses: actions/checkout@v4
+        with:
+          ref: phase-b/rc1-empirical-validation
+          path: evaluator
+          fetch-depth: 0
+
+      - name: Require persisted inventory evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s evaluator/docs/evaluations/2026-08-24-phase-b-cytoscape-inventory.json
+          node -e "const x=require('./evaluator/docs/evaluations/2026-08-24-phase-b-cytoscape-inventory.json'); if (!x.inventoryCompletedBeforeAnalyzerInstall || x.upstreamSha !== '6bd1e50733155ea9f039457ef89b6c0e9595154a') process.exit(1)"
+
+      - name: Checkout same pinned target
+        uses: actions/checkout@v4
+        with:
+          repository: cytoscape/cytoscape-web
+          ref: 6bd1e50733155ea9f039457ef89b6c0e9595154a
+          path: target
+          fetch-depth: 1
+
+      - name: Verify pinned target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C target rev-parse HEAD)" = "6bd1e50733155ea9f039457ef89b6c0e9595154a"
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Run instrumented published-package evaluation
+        id: evaluation
+        shell: bash
+        run: |
+          set -uo pipefail
+          BASE="evaluator/docs/evaluations/2026-08-24-phase-b-cytoscape-rc1"
+          STATUS_FILE="${BASE}-run-status.json"
+          DIAG_FILE="${BASE}-diagnostics.md"
+          REPORT="${BASE}.json"
+          SUMMARY="${BASE}-summary.json"
+          mkdir -p runner phase-b-logs
+
+          INSTALL_STATUS=-1
+          PROVENANCE_STATUS=-1
+          ANALYZER_STATUS=-1
+          PARSE_STATUS=-1
+          FINAL_STATUS="unknown"
+
+          cd runner
+          npm init -y >../phase-b-logs/npm-init.log 2>&1
+          npm install --no-fund --no-audit --save-exact ui-behavior-coverage@0.1.0-rc.1 >../phase-b-logs/npm-install.log 2>&1
+          INSTALL_STATUS=$?
+
+          if [[ "$INSTALL_STATUS" -eq 0 ]]; then
+            node <<'NODE' >../phase-b-logs/provenance.log 2>&1
+          const fs = require('node:fs');
+          const pkg = JSON.parse(fs.readFileSync('node_modules/ui-behavior-coverage/package.json', 'utf8'));
+          const api = require('ui-behavior-coverage');
+          if (pkg.version !== '0.1.0-rc.1') throw new Error(`installed version: ${pkg.version}`);
+          if (api.TOOL_VERSION !== '0.1.0-rc.1') throw new Error(`TOOL_VERSION: ${api.TOOL_VERSION}`);
+          console.log(`Published package verified: ${pkg.name}@${pkg.version}`);
+          console.log(`TOOL_VERSION verified: ${api.TOOL_VERSION}`);
+          NODE
+            PROVENANCE_STATUS=$?
+          fi
+          cd ..
+
+          if [[ "$INSTALL_STATUS" -ne 0 ]]; then
+            FINAL_STATUS="install_failed"
+          elif [[ "$PROVENANCE_STATUS" -ne 0 ]]; then
+            FINAL_STATUS="provenance_failed"
+          else
+            "$GITHUB_WORKSPACE/runner/node_modules/.bin/ui-behavior-coverage" \
+              scan "$GITHUB_WORKSPACE/target/src" \
+              --json > "$REPORT" 2>phase-b-logs/analyzer-stderr.log
+            ANALYZER_STATUS=$?
+
+            if [[ "$ANALYZER_STATUS" -ne 0 ]]; then
+              FINAL_STATUS="analyzer_failed"
+            else
+              node <<'NODE' >phase-b-logs/parse.log 2>&1
+          const fs = require('node:fs');
+          const reportPath = 'evaluator/docs/evaluations/2026-08-24-phase-b-cytoscape-rc1.json';
+          const summaryPath = 'evaluator/docs/evaluations/2026-08-24-phase-b-cytoscape-rc1-summary.json';
+          const result = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+          if (result.toolVersion !== '0.1.0-rc.1') throw new Error(`unexpected toolVersion ${result.toolVersion}`);
+          const summary = result.summary ?? result.report?.summary ?? {};
+          const discovery = result.report?.discovery ?? result.discovery ?? null;
+          const compact = {
+            phase: 'B — RC.1 empirical validation',
+            repository: 'cytoscape/cytoscape-web',
+            scope: 'src',
+            upstreamSha: '6bd1e50733155ea9f039457ef89b6c0e9595154a',
+            analyzer: { package: 'ui-behavior-coverage', version: '0.1.0-rc.1', source: 'published npm package' },
+            schemaVersion: result.schemaVersion,
+            toolVersion: result.toolVersion,
+            summary,
+            discovery,
+          };
+          fs.writeFileSync(summaryPath, JSON.stringify(compact, null, 2) + '\n');
+          console.log(JSON.stringify(compact, null, 2));
+          NODE
+              PARSE_STATUS=$?
+              if [[ "$PARSE_STATUS" -eq 0 ]]; then
+                FINAL_STATUS="success"
+              else
+                FINAL_STATUS="parse_failed"
+              fi
+            fi
+          fi
+
+          cat > "$STATUS_FILE" <<EOF
+          {
+            "repository": "cytoscape/cytoscape-web",
+            "upstreamSha": "6bd1e50733155ea9f039457ef89b6c0e9595154a",
+            "package": "ui-behavior-coverage@0.1.0-rc.1",
+            "installStatus": ${INSTALL_STATUS},
+            "provenanceStatus": ${PROVENANCE_STATUS},
+            "analyzerStatus": ${ANALYZER_STATUS},
+            "parseStatus": ${PARSE_STATUS},
+            "finalStatus": "${FINAL_STATUS}"
+          }
+          EOF
+
+          {
+            echo "# Phase B Cytoscape RC.1 diagnostics"
+            echo
+            echo "- finalStatus: \`${FINAL_STATUS}\`"
+            echo "- installStatus: \`${INSTALL_STATUS}\`"
+            echo "- provenanceStatus: \`${PROVENANCE_STATUS}\`"
+            echo "- analyzerStatus: \`${ANALYZER_STATUS}\`"
+            echo "- parseStatus: \`${PARSE_STATUS}\`"
+            echo
+            echo "## npm install tail"
+            echo '```text'
+            tail -n 40 phase-b-logs/npm-install.log 2>/dev/null || true
+            echo '```'
+            echo
+            echo "## provenance"
+            echo '```text'
+            cat phase-b-logs/provenance.log 2>/dev/null || true
+            echo '```'
+            echo
+            echo "## analyzer stderr tail"
+            echo '```text'
+            tail -n 100 phase-b-logs/analyzer-stderr.log 2>/dev/null || true
+            echo '```'
+            echo
+            echo "## parse output"
+            echo '```text'
+            cat phase-b-logs/parse.log 2>/dev/null || true
+            echo '```'
+          } > "$DIAG_FILE"
+
+          echo "evaluation_status=$FINAL_STATUS" >> "$GITHUB_OUTPUT"
+          cat "$STATUS_FILE"
+          cat "$DIAG_FILE"
+          exit 0
+
+      - name: Persist evaluation evidence and diagnostics
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd evaluator
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --ff-only origin phase-b/rc1-empirical-validation
+          git add docs/evaluations/2026-08-24-phase-b-cytoscape-rc1-run-status.json
+          git add docs/evaluations/2026-08-24-phase-b-cytoscape-rc1-diagnostics.md
+          [[ -f docs/evaluations/2026-08-24-phase-b-cytoscape-rc1.json ]] && git add docs/evaluations/2026-08-24-phase-b-cytoscape-rc1.json
+          [[ -f docs/evaluations/2026-08-24-phase-b-cytoscape-rc1-summary.json ]] && git add docs/evaluations/2026-08-24-phase-b-cytoscape-rc1-summary.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Record published RC.1 Cytoscape evaluation"
+            git push origin HEAD:phase-b/rc1-empirical-validation
+          fi
+
+      - name: Require successful empirical run
+        if: always()
+        shell: bash
+        run: |
+          if [[ "${{ steps.evaluation.outputs.evaluation_status }}" != "success" ]]; then
+            echo "::error::Phase B evaluation did not complete successfully: ${{ steps.evaluation.outputs.evaluation_status }}"
+            exit 1
+          fi
