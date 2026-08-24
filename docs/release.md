@@ -1,55 +1,124 @@
-# Alpha release procedure
+# npm release procedure
 
-Release candidate: `0.1.0-alpha.0`.
+Current release candidate: `0.1.0-rc.1`.
+
+The authoritative release workflow is `.github/workflows/release.yml`. It is a manually dispatched GitHub Actions workflow that validates the exact package version and npm publish channel before publishing.
+
+## Release channels
+
+The package currently uses these channels:
+
+- `alpha` for the original public alpha line;
+- `rc` for release candidates such as `0.1.0-rc.1`;
+- `latest` for the version that an unqualified `npm install ui-behavior-coverage` should install.
+
+The package's `publishConfig.tag` remains `rc` while the package version is an RC. A maintainer may intentionally promote a validated RC to `latest` after publication when that RC should become the default install:
+
+```bash
+npm dist-tag add ui-behavior-coverage@0.1.0-rc.1 latest
+npm dist-tag ls ui-behavior-coverage
+```
+
+Trusted Publishing/OIDC is used for `npm publish`; npm dist-tag changes require an authenticated npm session and are not performed by the OIDC release workflow.
 
 ## Required gates
 
-Before publishing or tagging a release:
+Before a real publication, the workflow runs the same repository gates used by CI:
 
 ```bash
 npm ci
 npm run check
 npm test
 npm run pack:check
-node scripts/verify-release-tag.mjs v0.1.0-alpha.0
-npm publish --dry-run --tag alpha
 ```
 
-`npm test` includes the packed-consumer smoke test: it creates a tarball, installs that artifact into a temporary npm project, invokes the installed CLI, scans a fixture, and verifies CommonJS and ESM loading.
+`npm test` includes the packed-consumer smoke test. It builds a tarball, installs that artifact into a temporary npm project, invokes the installed CLI, scans a fixture, and verifies CommonJS and ESM loading.
 
-The release tag must exactly match `v${package.json.version}`. Alpha builds are published under the npm `alpha` dist-tag. The npm registry also requires package metadata to contain a `latest` dist-tag; for a package whose only published version is the first alpha, `latest` can point to that same alpha even though publication used `--tag alpha`. Do not try to delete `latest`; move it to the first stable release when one exists.
+The workflow also validates that:
 
-## First-publication bootstrap
+- `package.json`, `package-lock.json`, `CHANGELOG.md`, README release text, and `TOOL_VERSION` agree on the requested version;
+- `publishConfig.access` is public and `publishConfig.tag` matches the selected publication channel;
+- the release is run from the current `main` branch;
+- the exact package tarball contains a non-empty `package/README.md` matching the intended release source;
+- an already-published version is never published again;
+- after publication, the exact version exists on npm and the selected publication dist-tag points to it.
 
-The release workflow lives at `.github/workflows/release-workflow.example.yml` and runs for `v*` tag pushes. It is idempotent: if the exact package version already exists on npm, it skips the duplicate publish.
+Version-specific npm README metadata is checked only as a best-effort diagnostic after publication. It is not a release blocker because the packaged README is verified directly from the tarball before publication.
 
-For the first publication, verify the local npm session and registry, confirm the package name/version is not already present, run the dry-run gates, and publish `0.1.0-alpha.0` under the `alpha` dist-tag.
+## Normal RC release
 
-After the package exists, configure npm Trusted Publishing for GitHub owner `sapniyogi`, repository `ui-behavior-coverage`, workflow filename `release-workflow.example.yml`, with `npm publish` allowed.
+For a new release candidate:
 
-After Trusted Publishing is configured, push `v0.1.0-alpha.0`. The workflow will run all release checks and skip a duplicate registry publish if the bootstrap version is already present.
+1. update the package version, lockfile, changelog, README release text, and `TOOL_VERSION` together;
+2. merge the release preparation to `main` only after CI is green;
+3. run `.github/workflows/release.yml` with:
+   - `version`: the exact RC version;
+   - `npm_tag`: `rc`;
+   - `dry_run`: `true`;
+   - `release_commit`: leave blank;
+4. inspect the dry-run artifact and logs;
+5. run the same workflow again with `dry_run: false`;
+6. verify the npm version/tag, Git tag, and GitHub prerelease.
 
-## Subsequent prereleases
+For stable `0.1.0`, use `npm_tag: latest` only after the package metadata has been changed from the RC version to the stable version.
 
-For later alpha versions, update `package.json`, merge the release change to `main`, and push the matching `v*` tag. The workflow publishes new versions under the `alpha` dist-tag.
+## Recovery after npm publication succeeded
 
-Reserve `latest` for a stable release once a stable version exists. Until then, the registry may keep `latest` pointing at the only published alpha version.
+A real publish can succeed on npm and still fail later while verifying registry metadata or creating GitHub release bookkeeping. Because npm package versions are immutable, **do not republish the same version**.
+
+The workflow supports recovery through the optional `release_commit` input. Use it only for a version that already exists on npm.
+
+For the `0.1.0-rc.1` recovery, the original release source commit is:
+
+```text
+e97b390d3499bbda40ee5e21383a40988a98f8ab
+```
+
+After the recovery-capable workflow is merged to `main`, first run a recovery dry run with:
+
+```text
+version: 0.1.0-rc.1
+npm_tag: rc
+dry_run: true
+release_commit: e97b390d3499bbda40ee5e21383a40988a98f8ab
+```
+
+Recovery mode:
+
+- requires the requested version to already exist on npm;
+- validates that the original commit reports the requested package and tool version;
+- downloads the already-published npm tarball instead of rebuilding an artifact for publication;
+- verifies that the published tarball's version and README match the original release source;
+- never calls `npm publish`;
+- creates or verifies `v<version>` at the original release source commit;
+- creates or updates the GitHub prerelease and attaches the published npm artifact.
+
+If the recovery dry run succeeds, repeat with `dry_run: false` to backfill the missing Git tag and GitHub prerelease.
+
+## Trusted Publishing
+
+npm Trusted Publishing is configured for:
+
+- GitHub owner: `sapniyogi`
+- repository: `ui-behavior-coverage`
+- workflow: `release.yml`
+- publication command: `npm publish`
+
+The workflow requires `id-token: write` and a GitHub-hosted runner. Keep the trusted-publisher workflow filename synchronized with npm package settings.
 
 ## Release checklist
 
-- `main` contains the exact release source.
+- `main` contains the intended release preparation or recovery workflow.
 - CI is green on supported Node versions.
 - consumer tarball smoke passes.
-- `npm pack --dry-run` contains only intended files.
-- `npm publish --dry-run --tag alpha` shows the intended package/version/content.
-- npm CLI authentication and registry are verified.
-- package-name/version availability is checked before the first publish.
-- `publishConfig.tag` is `alpha` for the prerelease.
-- README installs the prerelease with `ui-behavior-coverage@alpha`.
-- precision audit has zero known false VERIFIED classifications.
-- changelog entry exists.
-- first publication is verified in the npm registry.
-- `alpha` points to the prerelease; if `latest` also points to the first alpha because no stable version exists yet, leave it in place and move it when the first stable version is published.
-- Trusted Publishing is configured for the exact workflow filename before automated future publishes.
-- git tag matches `package.json` version.
+- `npm pack --dry-run` contains only intended files for a new publication.
+- the workflow dry run succeeds before a new real publication.
+- package name/version availability is checked before publishing a new version.
+- `publishConfig.tag` matches the publication channel (`rc` for the current RC line).
+- README and changelog identify the intended release version.
+- precision audit has no known false VERIFIED classifications that block release.
+- the selected npm publication dist-tag points to the released version.
+- if an RC is intentionally promoted as the default install, `latest` is moved separately with authenticated npm dist-tag tooling.
+- the Git tag points to the exact source commit for the published package version.
+- a GitHub prerelease exists for RC versions and includes the npm package artifact.
 - npm package page/repository metadata point to this repository.

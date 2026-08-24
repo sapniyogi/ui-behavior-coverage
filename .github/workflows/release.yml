@@ -11,7 +11,7 @@ on:
         default: 0.1.0-rc.1
         type: string
       npm_tag:
-        description: npm dist-tag
+        description: npm dist-tag used for publication
         required: true
         default: rc
         type: choice
@@ -21,10 +21,15 @@ on:
           - alpha
           - latest
       dry_run:
-        description: Validate everything without publishing
+        description: Validate everything without publishing or creating GitHub release metadata
         required: true
         default: true
         type: boolean
+      release_commit:
+        description: Optional original source commit for recovery of an already-published version
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: write
@@ -42,6 +47,7 @@ jobs:
     env:
       RELEASE_VERSION: ${{ inputs.version }}
       NPM_TAG: ${{ inputs.npm_tag }}
+      RELEASE_COMMIT_INPUT: ${{ inputs.release_commit }}
 
     steps:
       - name: Checkout release source
@@ -49,7 +55,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Verify release source is current main
+      - name: Verify release workflow source
         shell: bash
         run: |
           set -euo pipefail
@@ -74,7 +80,25 @@ jobs:
             exit 1
           fi
 
-          echo "Release source verified: $GITHUB_SHA"
+          RELEASE_COMMIT="$GITHUB_SHA"
+          if [[ -n "${RELEASE_COMMIT_INPUT:-}" ]]; then
+            if ! git rev-parse --verify "${RELEASE_COMMIT_INPUT}^{commit}" >/dev/null 2>&1; then
+              echo "::error::Recovery release_commit '${RELEASE_COMMIT_INPUT}' is not a valid commit."
+              exit 1
+            fi
+
+            RELEASE_COMMIT="$(git rev-parse "${RELEASE_COMMIT_INPUT}^{commit}")"
+            if ! git merge-base --is-ancestor "$RELEASE_COMMIT" "$GITHUB_SHA"; then
+              echo "::error::Recovery release_commit ${RELEASE_COMMIT} is not an ancestor of current main."
+              exit 1
+            fi
+
+            echo "Recovery mode requested for original release source ${RELEASE_COMMIT}."
+          fi
+
+          echo "RELEASE_COMMIT=${RELEASE_COMMIT}" >> "$GITHUB_ENV"
+          echo "Workflow source verified: $GITHUB_SHA"
+          echo "Release source commit:    $RELEASE_COMMIT"
 
       - name: Set up Node
         uses: actions/setup-node@v6
@@ -217,6 +241,42 @@ jobs:
           console.log("Release metadata validated.");
           NODE
 
+      - name: Validate recovery source metadata
+        if: ${{ inputs.release_commit != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+
+          git show "${RELEASE_COMMIT}:package.json" > "$TMP_DIR/package.json"
+          git show "${RELEASE_COMMIT}:src/report-schema.ts" > "$TMP_DIR/report-schema.ts"
+
+          node - "$TMP_DIR/package.json" "$TMP_DIR/report-schema.ts" <<'NODE'
+          const fs = require("node:fs");
+          const pkg = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+          const schema = fs.readFileSync(process.argv[3], "utf8");
+          const expected = process.env.RELEASE_VERSION;
+          const match = schema.match(/export const TOOL_VERSION = '([^']+)' as const;/);
+
+          if (pkg.version !== expected) {
+            console.error(
+              `Recovery source package version '${pkg.version}' does not match '${expected}'.`,
+            );
+            process.exit(1);
+          }
+
+          if (!match || match[1] !== expected) {
+            console.error(
+              `Recovery source TOOL_VERSION does not match '${expected}'.`,
+            );
+            process.exit(1);
+          }
+          NODE
+
+          echo "Recovery source metadata matches ${RELEASE_VERSION}."
+
       - name: Inspect registry and Git tag state
         id: state
         shell: bash
@@ -260,16 +320,23 @@ jobs:
 
           if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
             TAG_TARGET="$(git rev-list -n 1 "${TAG}")"
-            if [[ "$TAG_TARGET" != "$GITHUB_SHA" ]]; then
-              echo "::error::Existing Git tag ${TAG} points to ${TAG_TARGET}, not ${GITHUB_SHA}."
+            if [[ "$TAG_TARGET" != "$RELEASE_COMMIT" ]]; then
+              echo "::error::Existing Git tag ${TAG} points to ${TAG_TARGET}, not ${RELEASE_COMMIT}."
               exit 1
             fi
             echo "git_tag_exists=true" >> "$GITHUB_OUTPUT"
-            echo "Git tag ${TAG} already points to this release commit."
+            echo "Git tag ${TAG} already points to the intended release commit."
           else
             echo "git_tag_exists=false" >> "$GITHUB_OUTPUT"
             echo "Git tag ${TAG} is available."
           fi
+
+      - name: Require published version for recovery mode
+        if: ${{ inputs.release_commit != '' && steps.state.outputs.published != 'true' }}
+        shell: bash
+        run: |
+          echo "::error::release_commit recovery mode is only allowed for a version that is already published on npm."
+          exit 1
 
       - name: Run release checks
         run: npm run release:check
@@ -280,7 +347,17 @@ jobs:
         run: |
           set -euo pipefail
 
-          TARBALL="$(npm pack --silent)"
+          NAME="$(node -p "require('./package.json').name")"
+          RECOVERY_MODE=false
+
+          if [[ -n "${RELEASE_COMMIT_INPUT:-}" ]]; then
+            RECOVERY_MODE=true
+            echo "Recovery mode: downloading the already-published npm artifact."
+            TARBALL="$(npm pack "${NAME}@${RELEASE_VERSION}" --silent)"
+          else
+            TARBALL="$(npm pack --silent)"
+          fi
+
           if [[ ! -f "$TARBALL" ]]; then
             echo "::error::npm pack did not create ${TARBALL}"
             exit 1
@@ -298,10 +375,23 @@ jobs:
 
           TMP_DIR="$(mktemp -d)"
           trap 'rm -rf "$TMP_DIR"' EXIT
-          tar -xzf "$TARBALL" -C "$TMP_DIR" package/README.md
+          tar -xzf "$TARBALL" -C "$TMP_DIR" package/README.md package/package.json
 
-          if ! cmp -s README.md "$TMP_DIR/package/README.md"; then
-            echo "::error::README.md in the release tarball differs from repository README.md."
+          PACKAGED_VERSION="$(node -p "require('$TMP_DIR/package/package.json').version")"
+          if [[ "$PACKAGED_VERSION" != "$RELEASE_VERSION" ]]; then
+            echo "::error::Tarball package version '${PACKAGED_VERSION}' does not match '${RELEASE_VERSION}'."
+            exit 1
+          fi
+
+          if [[ "$RECOVERY_MODE" == "true" ]]; then
+            git show "${RELEASE_COMMIT}:README.md" > "$TMP_DIR/expected-README.md"
+            EXPECTED_README="$TMP_DIR/expected-README.md"
+          else
+            EXPECTED_README="README.md"
+          fi
+
+          if ! cmp -s "$EXPECTED_README" "$TMP_DIR/package/README.md"; then
+            echo "::error::README.md in the release tarball differs from the intended release-source README.md."
             exit 1
           fi
 
@@ -310,7 +400,7 @@ jobs:
             exit 1
           fi
 
-          echo "Tarball README verified ($(wc -c < "$TMP_DIR/package/README.md") bytes)."
+          echo "Tarball version and README verified ($(wc -c < "$TMP_DIR/package/README.md") README bytes)."
 
       - name: Archive release package
         uses: actions/upload-artifact@v4
@@ -321,7 +411,7 @@ jobs:
           retention-days: 30
 
       - name: npm publish dry run
-        if: ${{ inputs.dry_run }}
+        if: ${{ inputs.dry_run && inputs.release_commit == '' }}
         run: |
           npm publish \
             "${{ steps.pack.outputs.tarball }}" \
@@ -329,15 +419,19 @@ jobs:
             --tag "$NPM_TAG" \
             --dry-run
 
+      - name: Recovery dry-run summary
+        if: ${{ inputs.dry_run && inputs.release_commit != '' }}
+        run: echo "Recovery dry run verified the already-published npm artifact and original release source; no publication or GitHub metadata was changed."
+
       - name: Publish to npm
-        if: ${{ !inputs.dry_run && steps.state.outputs.published != 'true' }}
+        if: ${{ !inputs.dry_run && inputs.release_commit == '' && steps.state.outputs.published != 'true' }}
         run: |
           npm publish \
             "${{ steps.pack.outputs.tarball }}" \
             --access public \
             --tag "$NPM_TAG"
 
-      - name: Verify npm release and README metadata
+      - name: Verify npm release
         if: ${{ !inputs.dry_run }}
         shell: bash
         run: |
@@ -349,29 +443,33 @@ jobs:
           for attempt in {1..24}; do
             VERSION_RESULT="$(npm view "${NAME}@${RELEASE_VERSION}" version 2>/dev/null || true)"
             TAG_RESULT="$(npm view "${NAME}@${NPM_TAG}" version 2>/dev/null || true)"
-            README_RESULT="$(npm view "${NAME}@${RELEASE_VERSION}" readme 2>/dev/null || true)"
 
             if [[ "$VERSION_RESULT" == "$RELEASE_VERSION" && \
-                  "$TAG_RESULT" == "$RELEASE_VERSION" && \
-                  -n "$README_RESULT" && \
-                  "$README_RESULT" == *"# ui-behavior-coverage"* && \
-                  "$README_RESULT" == *"${RELEASE_VERSION}"* ]]; then
+                  "$TAG_RESULT" == "$RELEASE_VERSION" ]]; then
               SUCCESS=true
               break
             fi
 
-            echo "Registry metadata not fully updated yet; retrying (${attempt}/24)..."
+            echo "Registry version/dist-tag not fully updated yet; retrying (${attempt}/24)..."
             sleep 5
           done
 
           if [[ "$SUCCESS" != "true" ]]; then
-            echo "::error::Published version, npm dist-tag, or version-specific README metadata could not be verified."
+            echo "::error::Published version or npm dist-tag could not be verified."
             exit 1
           fi
 
           echo "${NAME}@${RELEASE_VERSION} verified."
           echo "${NPM_TAG} -> ${RELEASE_VERSION} verified."
-          echo "Version-specific npm README metadata verified."
+
+          README_RESULT="$(npm view "${NAME}@${RELEASE_VERSION}" readme 2>/dev/null || true)"
+          if [[ -z "$README_RESULT" ]]; then
+            echo "::warning::Version-specific npm README metadata is empty or unavailable. The packaged README was already verified from the release tarball."
+          elif [[ "$README_RESULT" != *"# ui-behavior-coverage"* ]]; then
+            echo "::warning::Version-specific npm README metadata is populated but does not contain the expected package heading. The packaged README was already verified from the release tarball."
+          else
+            echo "Version-specific npm README metadata is visible."
+          fi
 
       - name: Create or verify Git tag
         if: ${{ !inputs.dry_run }}
@@ -382,11 +480,11 @@ jobs:
           TAG="v${RELEASE_VERSION}"
 
           if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
-            echo "Git tag ${TAG} already exists at the correct commit."
+            echo "Git tag ${TAG} already exists at the correct release commit."
             exit 0
           fi
 
-          git tag "${TAG}" "$GITHUB_SHA"
+          git tag "${TAG}" "$RELEASE_COMMIT"
           git push origin "refs/tags/${TAG}"
 
       - name: Create or update GitHub Release
@@ -403,7 +501,7 @@ jobs:
           if gh release view "${TAG}" >/dev/null 2>&1; then
             echo "GitHub Release ${TAG} already exists."
           else
-            if [[ "$NPM_TAG" == "latest" ]]; then
+            if [[ "$NPM_TAG" == "latest" && "$RELEASE_VERSION" != *-* ]]; then
               gh release create "${TAG}" \
                 --title "${TAG}" \
                 --generate-notes \
@@ -427,6 +525,8 @@ jobs:
             echo
             echo "- Version: \`${RELEASE_VERSION}\`"
             echo "- npm tag: \`${NPM_TAG}\`"
-            echo "- Source commit: \`${GITHUB_SHA}\`"
+            echo "- Workflow commit: \`${GITHUB_SHA}\`"
+            echo "- Release source commit: \`${RELEASE_COMMIT:-$GITHUB_SHA}\`"
+            echo "- Recovery mode: \`${{ inputs.release_commit != '' }}\`"
             echo "- Dry run: \`${{ inputs.dry_run }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
