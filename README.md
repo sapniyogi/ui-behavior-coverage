@@ -6,7 +6,7 @@ Traditional code coverage asks **“did this code execute?”** `ui-behavior-cov
 
 > **Did the test explicitly verify the UI behavior it exercised?**
 
-> **Release-candidate status:** `0.1.0-rc.1` is intentionally conservative. Unsupported or ambiguous patterns are skipped rather than guessed. Treat findings as test-quality evidence to review, not as a replacement for test execution or browser automation.
+> **Release-candidate status:** `0.1.0-rc.2` is intentionally conservative. Unsupported or ambiguous patterns are skipped rather than guessed. Treat findings as test-quality evidence to review, not as a replacement for test execution or browser automation.
 
 ## Why this matters for AI-generated tests
 
@@ -119,6 +119,8 @@ The analyzer recognizes MUI statically from imports; **it does not install or ex
 | barrel exports and named aliases | ✅ |
 | TypeScript path aliases | ✅ |
 | configurable render-helper normalization | ✅ |
+| statically safe local test render-helper reach | ✅ conservative |
+| Testing Library `rerender()` state evidence | ✅ conservative |
 | non-native MUI `Select` popup interaction semantics | ❌ |
 | arbitrary hooks/context/effects/state machines | ❌ |
 | browser layout, portals, computed CSS, animation timing | ❌ |
@@ -159,7 +161,7 @@ Discovery telemetry is included in project reports so “zero behaviors” can b
 ```json
 {
   "schemaVersion": "1",
-  "toolVersion": "0.1.0-rc.1",
+  "toolVersion": "0.1.0-rc.2",
   "reportType": "project",
   "summary": {
     "discovered": 9,
@@ -224,6 +226,8 @@ See [`docs/design-guidance.md`](docs/design-guidance.md).
 
 The RC is evaluated with pinned external React/MUI application scopes and precision-focused regression fixtures. Phase 8A broadened the external corpus beyond the original alpha benchmark and hardened assertion-target correlation, interaction-target correlation, wrapper/control-flow handling, callback payload inference, and distinct behavior identity.
 
+Phase B validation for RC.2 preparation preserved the published RC.1 output and separately adjudicated findings on pinned external repositories before changing analyzer behavior. Confirmed Cytoscape cases were converted into regression tests for internal-handler suppression, safe local render-helper reach, `rerender()` state propagation, and exact dynamic-target DOM-property verification.
+
 The release strategy is deliberately precision-first: unsupported or ambiguous behavior remains unclassified rather than being guessed. The RC release gate includes type-checking, unit and consumer smoke tests, package-content validation, pinned external evaluation, adversarial regression fixtures, and manual adjudication of the high-value reached/verified findings before release.
 
 Published evaluation records include:
@@ -258,7 +262,7 @@ npm run pack:check
 
 `npm test` includes a clean consumer smoke path that packs the package, installs the resulting tarball into a temporary npm project, invokes the installed CLI, scans a fixture, and verifies CommonJS and ESM loading.
 
-The manual npm release workflow additionally checks that the release tarball contains the exact repository `README.md` and, after publication, verifies that npm exposes non-empty version-specific README metadata before Git tagging and GitHub Release creation.
+The manual npm release workflow additionally verifies that the release tarball contains the exact repository `README.md`. After publication, the immutable version and selected npm dist-tag are hard verification gates; package-level npm README metadata is checked best-effort and produces a warning rather than blocking Git tagging and GitHub Release creation.
 
 See [`docs/release.md`](docs/release.md).
 
