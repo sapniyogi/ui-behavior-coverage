@@ -1,0 +1,19 @@
+{
+  "phase": "B — RC.1 empirical validation",
+  "evaluationDate": "2026-08-23",
+  "analyzer": {
+    "package": "ui-behavior-coverage",
+    "version": "0.1.0-rc.1",
+    "source": "published npm package"
+  },
+  "repositories": [
+    {
+      "slug": "linode-apl-console",
+      "repository": "linode/apl-console",
+      "scope": "src",
+      "upstreamSha": "961e3a24fc9fa5ee3294370f9a25dbf911a4ec01",
+      "role": "primary production MUI / React Hook Form benchmark",
+      "status": "locked"
+    }
+  ]
+}

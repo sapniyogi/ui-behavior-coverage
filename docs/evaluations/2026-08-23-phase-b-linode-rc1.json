@@ -1,0 +1,455 @@
+{
+  "rootDir": "/home/runner/work/ui-behavior-coverage/ui-behavior-coverage/target/src",
+  "componentsAnalyzed": 12,
+  "testFilesAnalyzed": 12,
+  "reports": [
+    {
+      "componentFile": "components/Header.tsx",
+      "testFile": "components/Header.test.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "components/InformationBanner.tsx",
+      "testFile": "components/InformationBanner.test.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "components/ListTable.tsx",
+      "testFile": "components/ListTable.test.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "components/modals/ConfigureGitModal.tsx",
+      "testFile": "components/modals/ConfigureGitModal.test.tsx",
+      "results": [
+        {
+          "behavior": {
+            "id": "ConfigureGitModal:mui:isMigrating:handleClose:mui-button-disabled-event-suppression",
+            "componentName": "ConfigureGitModal",
+            "provider": "material-ui",
+            "kind": "mui-button-disabled-event-suppression",
+            "title": "isMigrating=true prevents handleClose activation",
+            "condition": {
+              "prop": "isMigrating",
+              "value": true
+            },
+            "event": {
+              "handlerProp": "handleClose",
+              "eventName": "click"
+            },
+            "expectation": {
+              "type": "callback-not-called",
+              "callbackProp": "handleClose"
+            },
+            "evidence": {
+              "fileName": "components/modals/ConfigureGitModal.tsx",
+              "line": 643,
+              "snippet": "<Button variant='outlined' color='primary' onClick={handleClose} disabled={isMigrating}>"
+            },
+            "target": {
+              "roles": [
+                "button",
+                "link"
+              ],
+              "candidateCount": 6,
+              "sourceTag": "Button"
+            }
+          },
+          "status": "discovered",
+          "reason": "No test establishes ConfigureGitModal with isMigrating=true and a resolvable handleClose callback."
+        }
+      ],
+      "scores": {
+        "discovered": 1,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "components/SubmitButton.tsx",
+      "testFile": "components/SubmitButton.test.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "layouts/Paper.tsx",
+      "testFile": "layouts/Paper.test.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "pages/builds/overview/BuildsOverviewPage.tsx",
+      "testFile": "pages/builds/overview/BuildsOverviewPage.test.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "pages/manifests/Manifests.tsx",
+      "testFile": "pages/manifests/Manifests.test.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "pages/network-policies/create-edit/NetworkPolicyPodLabelRow.tsx",
+      "testFile": "pages/network-policies/create-edit/NetworkPolicyPodLabelRow.test.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "pages/secrets/platform/overview/PlatformSecretOverviewPage.tsx",
+      "testFile": "pages/secrets/platform/overview/PlatformSecretsOverviewPage.test.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "pages/settings/platform/PlatformSettingsPage.tsx",
+      "testFile": "pages/settings/platform/PlatformSettingsPage.test.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "pages/SettingsOverview.tsx",
+      "testFile": "pages/SettingsOverview.test.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    }
+  ],
+  "scores": {
+    "discovered": 1,
+    "exercised": 0,
+    "verified": 0,
+    "behaviorReach": 0,
+    "behaviorVerification": 0,
+    "verificationGap": 0
+  },
+  "discovery": {
+    "totalTestFiles": 25,
+    "testFilesWithRuntimeJsx": 13,
+    "testFilesWithTargets": 12,
+    "importsExamined": 16,
+    "importsResolved": 12,
+    "skipped": {
+      "no-runtime-jsx": 12,
+      "no-rendered-component-import": 1,
+      "external-module": 4,
+      "unresolved-module": 0,
+      "unresolved-barrel-export": 0
+    }
+  },
+  "schemaVersion": "1",
+  "toolVersion": "0.1.0-rc.1",
+  "reportType": "project",
+  "summary": {
+    "discovered": 1,
+    "exercised": 0,
+    "verified": 0,
+    "behaviorReach": 0,
+    "behaviorVerification": 0,
+    "verificationGap": 0
+  },
+  "report": {
+    "rootDir": "/home/runner/work/ui-behavior-coverage/ui-behavior-coverage/target/src",
+    "componentsAnalyzed": 12,
+    "testFilesAnalyzed": 12,
+    "reports": [
+      {
+        "componentFile": "components/Header.tsx",
+        "testFile": "components/Header.test.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "components/InformationBanner.tsx",
+        "testFile": "components/InformationBanner.test.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "components/ListTable.tsx",
+        "testFile": "components/ListTable.test.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "components/modals/ConfigureGitModal.tsx",
+        "testFile": "components/modals/ConfigureGitModal.test.tsx",
+        "results": [
+          {
+            "behavior": {
+              "id": "ConfigureGitModal:mui:isMigrating:handleClose:mui-button-disabled-event-suppression",
+              "componentName": "ConfigureGitModal",
+              "provider": "material-ui",
+              "kind": "mui-button-disabled-event-suppression",
+              "title": "isMigrating=true prevents handleClose activation",
+              "condition": {
+                "prop": "isMigrating",
+                "value": true
+              },
+              "event": {
+                "handlerProp": "handleClose",
+                "eventName": "click"
+              },
+              "expectation": {
+                "type": "callback-not-called",
+                "callbackProp": "handleClose"
+              },
+              "evidence": {
+                "fileName": "components/modals/ConfigureGitModal.tsx",
+                "line": 643,
+                "snippet": "<Button variant='outlined' color='primary' onClick={handleClose} disabled={isMigrating}>"
+              },
+              "target": {
+                "roles": [
+                  "button",
+                  "link"
+                ],
+                "candidateCount": 6,
+                "sourceTag": "Button"
+              }
+            },
+            "status": "discovered",
+            "reason": "No test establishes ConfigureGitModal with isMigrating=true and a resolvable handleClose callback."
+          }
+        ],
+        "scores": {
+          "discovered": 1,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "components/SubmitButton.tsx",
+        "testFile": "components/SubmitButton.test.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "layouts/Paper.tsx",
+        "testFile": "layouts/Paper.test.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "pages/builds/overview/BuildsOverviewPage.tsx",
+        "testFile": "pages/builds/overview/BuildsOverviewPage.test.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "pages/manifests/Manifests.tsx",
+        "testFile": "pages/manifests/Manifests.test.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "pages/network-policies/create-edit/NetworkPolicyPodLabelRow.tsx",
+        "testFile": "pages/network-policies/create-edit/NetworkPolicyPodLabelRow.test.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "pages/secrets/platform/overview/PlatformSecretOverviewPage.tsx",
+        "testFile": "pages/secrets/platform/overview/PlatformSecretsOverviewPage.test.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "pages/settings/platform/PlatformSettingsPage.tsx",
+        "testFile": "pages/settings/platform/PlatformSettingsPage.test.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "pages/SettingsOverview.tsx",
+        "testFile": "pages/SettingsOverview.test.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      }
+    ],
+    "scores": {
+      "discovered": 1,
+      "exercised": 0,
+      "verified": 0,
+      "behaviorReach": 0,
+      "behaviorVerification": 0,
+      "verificationGap": 0
+    },
+    "discovery": {
+      "totalTestFiles": 25,
+      "testFilesWithRuntimeJsx": 13,
+      "testFilesWithTargets": 12,
+      "importsExamined": 16,
+      "importsResolved": 12,
+      "skipped": {
+        "no-runtime-jsx": 12,
+        "no-rendered-component-import": 1,
+        "external-module": 4,
+        "unresolved-module": 0,
+        "unresolved-barrel-export": 0
+      }
+    }
+  }
+}

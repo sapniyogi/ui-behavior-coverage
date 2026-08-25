@@ -1,0 +1,33 @@
+{
+  "phase": "B — corrected candidate comparison",
+  "repository": "cytoscape/cytoscape-web",
+  "scope": "src",
+  "upstreamSha": "6bd1e50733155ea9f039457ef89b6c0e9595154a",
+  "analyzer": {
+    "source": "agent/rc2-cytoscape-regressions",
+    "commit": "ed6153d1e7ce0c54db66c2358568c35de4420068",
+    "reportedToolVersion": "0.1.0-rc.1"
+  },
+  "summary": {
+    "discovered": 12,
+    "exercised": 8,
+    "verified": 1,
+    "behaviorReach": 66.7,
+    "behaviorVerification": 8.3,
+    "verificationGap": 58.4
+  },
+  "discovery": {
+    "totalTestFiles": 300,
+    "testFilesWithRuntimeJsx": 30,
+    "testFilesWithTargets": 30,
+    "importsExamined": 32,
+    "importsResolved": 30,
+    "skipped": {
+      "no-runtime-jsx": 270,
+      "no-rendered-component-import": 0,
+      "external-module": 2,
+      "unresolved-module": 0,
+      "unresolved-barrel-export": 0
+    }
+  }
+}

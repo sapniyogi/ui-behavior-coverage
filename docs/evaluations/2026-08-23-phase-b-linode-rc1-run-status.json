@@ -1,0 +1,10 @@
+{
+  "repository": "linode/apl-console",
+  "upstreamSha": "961e3a24fc9fa5ee3294370f9a25dbf911a4ec01",
+  "package": "ui-behavior-coverage@0.1.0-rc.1",
+  "installStatus": 0,
+  "provenanceStatus": 0,
+  "analyzerStatus": 0,
+  "parseStatus": 0,
+  "finalStatus": "success"
+}

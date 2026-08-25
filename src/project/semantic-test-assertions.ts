@@ -72,6 +72,24 @@ function samePrimitive(a: SemanticPrimitive | undefined, b: SemanticPrimitive | 
   return a !== undefined && b !== undefined && a === b;
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function dynamicTestIdMatches(snippet: string, queryTestId: string): boolean {
+  const attribute = snippet.match(/data-testid\s*=\s*\{\s*`([\s\S]*?)`\s*\}/m);
+  const template = attribute?.[1];
+  if (!template || !template.includes('${')) return false;
+  const parts = template.split(/\$\{[^}]+\}/g);
+  if (parts.length < 2) return false;
+  const pattern = `^${parts.map(escapeRegExp).join('.*?')}$`;
+  try {
+    return new RegExp(pattern).test(queryTestId);
+  } catch {
+    return false;
+  }
+}
+
 function targetCorrelates(
   target: ExpectTarget,
   behavior: RenderStateBehaviorContract,
@@ -85,7 +103,12 @@ function targetCorrelates(
     evidence.expectedValue !== undefined
       ? String(evidence.expectedValue)
       : undefined;
-  return queryTargetCorrelates(target.query, behavior.target, dynamicAccessibleName);
+  if (queryTargetCorrelates(target.query, behavior.target, dynamicAccessibleName)) return true;
+
+  return !!target.query?.testId &&
+    !behavior.target.testId &&
+    behavior.target.candidateCount === 1 &&
+    dynamicTestIdMatches(behavior.evidence.snippet, target.query.testId);
 }
 
 function assertionMatches(

@@ -1,0 +1,1705 @@
+{
+  "rootDir": "/home/runner/work/ui-behavior-coverage/ui-behavior-coverage/target/src",
+  "componentsAnalyzed": 29,
+  "testFilesAnalyzed": 30,
+  "reports": [
+    {
+      "componentFile": "boot/shell/BootShell.tsx",
+      "testFile": "boot/shell/bootShell.test.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "components/ValueTypeNameChip.tsx",
+      "testFile": "components/ValueTypeNameChip.spec.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "features/AppManager/AppInstallConfirmationDialog.tsx",
+      "testFile": "features/AppManager/AppInstallConfirmationDialog.spec.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "features/CytoscapeDesktopPermissionDialog.tsx",
+      "testFile": "features/CytoscapeDesktopPermissionDialog.spec.tsx",
+      "results": [
+        {
+          "behavior": {
+            "id": "CytoscapeDesktopPermissionDialog:visible:open:false",
+            "componentName": "CytoscapeDesktopPermissionDialog",
+            "provider": "material-ui",
+            "kind": "mui-dialog-visibility-render-state",
+            "title": "open=false renders visible=false",
+            "condition": {
+              "prop": "open",
+              "value": false
+            },
+            "event": {
+              "eventName": "render"
+            },
+            "expectation": {
+              "type": "element-visibility-state",
+              "visible": false
+            },
+            "evidence": {
+              "fileName": "/home/runner/work/ui-behavior-coverage/ui-behavior-coverage/target/src/features/CytoscapeDesktopPermissionDialog.tsx",
+              "line": 29,
+              "snippet": "<Dialog\n      open={open}\n      onClose={onCancel}\n      data-testid=\"cytoscape-desktop-permission-dialog\"\n    >"
+            },
+            "target": {
+              "roles": [
+                "dialog"
+              ],
+              "testId": "cytoscape-desktop-permission-dialog",
+              "candidateCount": 1,
+              "sourceTag": "Dialog"
+            }
+          },
+          "status": "discovered",
+          "reason": "No test reaches CytoscapeDesktopPermissionDialog with open=false in a control-flow-safe, resolvable form."
+        },
+        {
+          "behavior": {
+            "id": "CytoscapeDesktopPermissionDialog:visible:open:true",
+            "componentName": "CytoscapeDesktopPermissionDialog",
+            "provider": "material-ui",
+            "kind": "mui-dialog-visibility-render-state",
+            "title": "open=true renders visible=true",
+            "condition": {
+              "prop": "open",
+              "value": true
+            },
+            "event": {
+              "eventName": "render"
+            },
+            "expectation": {
+              "type": "element-visibility-state",
+              "visible": true
+            },
+            "evidence": {
+              "fileName": "/home/runner/work/ui-behavior-coverage/ui-behavior-coverage/target/src/features/CytoscapeDesktopPermissionDialog.tsx",
+              "line": 29,
+              "snippet": "<Dialog\n      open={open}\n      onClose={onCancel}\n      data-testid=\"cytoscape-desktop-permission-dialog\"\n    >"
+            },
+            "target": {
+              "roles": [
+                "dialog"
+              ],
+              "testId": "cytoscape-desktop-permission-dialog",
+              "candidateCount": 1,
+              "sourceTag": "Dialog"
+            }
+          },
+          "status": "exercised",
+          "testName": "explains the localhost permission prompt when open",
+          "reason": "The test reaches open=true, but never explicitly verifies visible=true on the correlated contract element.",
+          "suggestedAssertion": "expect(<element>).toBeVisible();"
+        }
+      ],
+      "scores": {
+        "discovered": 2,
+        "exercised": 1,
+        "verified": 0,
+        "behaviorReach": 50,
+        "behaviorVerification": 0,
+        "verificationGap": 50
+      }
+    },
+    {
+      "componentFile": "features/HierarchyViewer/components/FilterPanel/FilterPanel.tsx",
+      "testFile": "features/HierarchyViewer/components/FilterPanel/FilterPanel.spec.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "features/HierarchyViewer/components/MainPanel.tsx",
+      "testFile": "features/HierarchyViewer/components/MainPanel.spec.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "features/LayoutTools/FloatingLayoutToolsPanel.tsx",
+      "testFile": "features/LayoutTools/FloatingLayoutToolsPanel.spec.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "features/LLMQuery/components/HcxDisabledTooltip.tsx",
+      "testFile": "features/LLMQuery/components/HcxDisabledTooltip.spec.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "features/Messages/SnackbarMessageList.tsx",
+      "testFile": "features/Messages/SnackbarMessageList.test.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "features/NetworkPanel/NetworkPanel.tsx",
+      "testFile": "features/NetworkPanel/NetworkPanel.spec.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "features/NetworkPanel/NetworkTab.tsx",
+      "testFile": "features/NetworkPanel/NetworkTab.test.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "features/Onboarding/OnboardingHost.tsx",
+      "testFile": "features/Onboarding/OnboardingHost.spec.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "features/SyncTabs.tsx",
+      "testFile": "features/SyncTabs.spec.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "features/TableBrowser/components/TableHeaderTooltip.tsx",
+      "testFile": "features/TableBrowser/components/TableHeaderTooltip.spec.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "features/TableBrowser/ListPastePanel.tsx",
+      "testFile": "features/TableBrowser/ListPastePanel.spec.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "features/TableBrowser/ListValueEditorDialog.tsx",
+      "testFile": "features/TableBrowser/ListValueEditorDialog.spec.tsx",
+      "results": [
+        {
+          "behavior": {
+            "id": "ListValueEditorDialog:visible:open:false",
+            "componentName": "ListValueEditorDialog",
+            "provider": "material-ui",
+            "kind": "mui-dialog-visibility-render-state",
+            "title": "open=false renders visible=false",
+            "condition": {
+              "prop": "open",
+              "value": false
+            },
+            "event": {
+              "eventName": "render"
+            },
+            "expectation": {
+              "type": "element-visibility-state",
+              "visible": false
+            },
+            "evidence": {
+              "fileName": "/home/runner/work/ui-behavior-coverage/ui-behavior-coverage/target/src/features/TableBrowser/ListValueEditorDialog.tsx",
+              "line": 129,
+              "snippet": "<Dialog\n      open={open}\n      onClose={onCancel}\n      maxWidth=\"sm\"\n      fullWidth\n      data-testid=\"list-value-editor-dialog\"\n    >"
+            },
+            "target": {
+              "roles": [
+                "dialog"
+              ],
+              "testId": "list-value-editor-dialog",
+              "candidateCount": 1,
+              "sourceTag": "Dialog"
+            }
+          },
+          "status": "discovered",
+          "reason": "No test reaches ListValueEditorDialog with open=false in a control-flow-safe, resolvable form."
+        },
+        {
+          "behavior": {
+            "id": "ListValueEditorDialog:visible:open:true",
+            "componentName": "ListValueEditorDialog",
+            "provider": "material-ui",
+            "kind": "mui-dialog-visibility-render-state",
+            "title": "open=true renders visible=true",
+            "condition": {
+              "prop": "open",
+              "value": true
+            },
+            "event": {
+              "eventName": "render"
+            },
+            "expectation": {
+              "type": "element-visibility-state",
+              "visible": true
+            },
+            "evidence": {
+              "fileName": "/home/runner/work/ui-behavior-coverage/ui-behavior-coverage/target/src/features/TableBrowser/ListValueEditorDialog.tsx",
+              "line": 129,
+              "snippet": "<Dialog\n      open={open}\n      onClose={onCancel}\n      maxWidth=\"sm\"\n      fullWidth\n      data-testid=\"list-value-editor-dialog\"\n    >"
+            },
+            "target": {
+              "roles": [
+                "dialog"
+              ],
+              "testId": "list-value-editor-dialog",
+              "candidateCount": 1,
+              "sourceTag": "Dialog"
+            }
+          },
+          "status": "exercised",
+          "testName": "renders one input row per existing list element",
+          "reason": "The test reaches open=true, but never explicitly verifies visible=true on the correlated contract element.",
+          "suggestedAssertion": "expect(<element>).toBeVisible();"
+        }
+      ],
+      "scores": {
+        "discovered": 2,
+        "exercised": 1,
+        "verified": 0,
+        "behaviorReach": 50,
+        "behaviorVerification": 0,
+        "verificationGap": 50
+      }
+    },
+    {
+      "componentFile": "features/TableBrowser/TableColumnForm.tsx",
+      "testFile": "features/TableBrowser/TableColumnForm.spec.tsx",
+      "results": [
+        {
+          "behavior": {
+            "id": "CreateTableColumnForm:visible:open:false",
+            "componentName": "CreateTableColumnForm",
+            "provider": "material-ui",
+            "kind": "mui-dialog-visibility-render-state",
+            "title": "open=false renders visible=false",
+            "condition": {
+              "prop": "open",
+              "value": false
+            },
+            "event": {
+              "eventName": "render"
+            },
+            "expectation": {
+              "type": "element-visibility-state",
+              "visible": false
+            },
+            "evidence": {
+              "fileName": "/home/runner/work/ui-behavior-coverage/ui-behavior-coverage/target/src/features/TableBrowser/TableColumnForm.tsx",
+              "line": 303,
+              "snippet": "<Dialog\n      data-testid=\"create-table-column-dialog\"\n      maxWidth=\"sm\"\n      fullWidth={true}\n      open={props.open}\n      onClose={props.onClose}\n    >"
+            },
+            "target": {
+              "roles": [
+                "dialog"
+              ],
+              "testId": "create-table-column-dialog",
+              "candidateCount": 1,
+              "sourceTag": "Dialog"
+            }
+          },
+          "status": "exercised",
+          "testName": "resets its state when reopened instead of when submitted",
+          "reason": "The test reaches open=false, but never explicitly verifies visible=false on the correlated contract element.",
+          "suggestedAssertion": "expect(<element>).not.toBeVisible();"
+        },
+        {
+          "behavior": {
+            "id": "CreateTableColumnForm:visible:open:true",
+            "componentName": "CreateTableColumnForm",
+            "provider": "material-ui",
+            "kind": "mui-dialog-visibility-render-state",
+            "title": "open=true renders visible=true",
+            "condition": {
+              "prop": "open",
+              "value": true
+            },
+            "event": {
+              "eventName": "render"
+            },
+            "expectation": {
+              "type": "element-visibility-state",
+              "visible": true
+            },
+            "evidence": {
+              "fileName": "/home/runner/work/ui-behavior-coverage/ui-behavior-coverage/target/src/features/TableBrowser/TableColumnForm.tsx",
+              "line": 303,
+              "snippet": "<Dialog\n      data-testid=\"create-table-column-dialog\"\n      maxWidth=\"sm\"\n      fullWidth={true}\n      open={props.open}\n      onClose={props.onClose}\n    >"
+            },
+            "target": {
+              "roles": [
+                "dialog"
+              ],
+              "testId": "create-table-column-dialog",
+              "candidateCount": 1,
+              "sourceTag": "Dialog"
+            }
+          },
+          "status": "exercised",
+          "testName": "resets its state when reopened instead of when submitted",
+          "reason": "The test reaches open=true, but never explicitly verifies visible=true on the correlated contract element.",
+          "suggestedAssertion": "expect(<element>).toBeVisible();"
+        }
+      ],
+      "scores": {
+        "discovered": 2,
+        "exercised": 2,
+        "verified": 0,
+        "behaviorReach": 100,
+        "behaviorVerification": 0,
+        "verificationGap": 100
+      }
+    },
+    {
+      "componentFile": "features/ToolBar/DebugIndicator.tsx",
+      "testFile": "features/ToolBar/DebugIndicator.spec.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "features/ToolBar/DropdownMenu.tsx",
+      "testFile": "features/ToolBar/DropdownMenu.spec.tsx",
+      "results": [
+        {
+          "behavior": {
+            "id": "DropdownMenu:mui:disabled:true:onOpenChange:mui-button-disabled-event-suppression",
+            "componentName": "DropdownMenu",
+            "provider": "material-ui",
+            "kind": "mui-button-disabled-event-suppression",
+            "title": "disabled=true prevents onOpenChange activation",
+            "condition": {
+              "prop": "disabled",
+              "value": true
+            },
+            "event": {
+              "handlerProp": "onOpenChange",
+              "eventName": "click"
+            },
+            "expectation": {
+              "type": "callback-not-called",
+              "callbackProp": "onOpenChange"
+            },
+            "evidence": {
+              "fileName": "features/ToolBar/DropdownMenu.tsx",
+              "line": 195,
+              "snippet": "<Button\n            data-testid={`toolbar-${id}-menu-button`}\n            disabled={disabled}\n            sx={{\n              color: darkPalette.text.primary,\n              textTransform: 'none',\n              '&.Mui-disabled': {\n                color: darkPalette.text.disabled,\n              },\n            }}\n            id={`${id}-dropdown`}\n            aria-controls={open ? 'basic-menu' : undefined}\n            aria-haspopup=\"true\"\n            aria-expanded={open ? 'true' : undefined}\n            onClick={handleClick}\n          >"
+            },
+            "target": {
+              "roles": [
+                "button",
+                "link"
+              ],
+              "candidateCount": 1,
+              "sourceTag": "Button"
+            }
+          },
+          "status": "exercised",
+          "testName": "disables the menu button and does not open when disabled",
+          "callbackVariable": "onOpenChange",
+          "reason": "The test reaches the behavior condition and performs click, but the interaction target cannot be positively correlated with the contract element; verification is withheld."
+        },
+        {
+          "behavior": {
+            "id": "DropdownMenu:mui-render:mui-button-disabled-render-state:disabled:true:disabled:true",
+            "componentName": "DropdownMenu",
+            "provider": "material-ui",
+            "kind": "mui-button-disabled-render-state",
+            "title": "disabled=true renders disabled=true",
+            "condition": {
+              "prop": "disabled",
+              "value": true
+            },
+            "event": {
+              "eventName": "render"
+            },
+            "expectation": {
+              "type": "element-boolean-state",
+              "state": "disabled",
+              "value": true
+            },
+            "evidence": {
+              "fileName": "/home/runner/work/ui-behavior-coverage/ui-behavior-coverage/target/src/features/ToolBar/DropdownMenu.tsx",
+              "line": 195,
+              "snippet": "<Button\n            data-testid={`toolbar-${id}-menu-button`}\n            disabled={disabled}\n            sx={{\n              color: darkPalette.text.primary,\n              textTransform: 'none',\n              '&.Mui-disabled': {\n                color: darkPalette.text.disabled,\n              },\n            }}\n            id={`${id}-dropdown`}\n            aria-controls={open ? 'basic-menu' : undefined}\n            aria-haspopup=\"true\"\n            aria-expanded={open ? 'true' : undefined}\n            onClick={handleClick}\n          >"
+            },
+            "target": {
+              "roles": [
+                "button",
+                "link"
+              ],
+              "candidateCount": 1,
+              "sourceTag": "Button"
+            }
+          },
+          "status": "verified",
+          "testName": "disables the menu button and does not open when disabled",
+          "reason": "The test reaches disabled=true and explicitly verifies disabled=true on the correlated contract element."
+        }
+      ],
+      "scores": {
+        "discovered": 2,
+        "exercised": 2,
+        "verified": 1,
+        "behaviorReach": 100,
+        "behaviorVerification": 50,
+        "verificationGap": 50
+      }
+    },
+    {
+      "componentFile": "features/ToolBar/EditMenu/CreateNodeMenuItem.tsx",
+      "testFile": "features/ToolBar/EditMenu/CreateNodeMenuItem.spec.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "features/ToolBar/HelpMenu/AboutCytoscapeWebMenuItem.tsx",
+      "testFile": "features/ToolBar/HelpMenu/AboutCytoscapeWebMenuItem.spec.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "features/ToolBar/Search/SearchBox.tsx",
+      "testFile": "features/ToolBar/Search/SearchBox.test.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "features/Vizmapper/Forms/MappingForm/ContinuousMappingForm/ColorPalettePicker.tsx",
+      "testFile": "features/Vizmapper/Forms/MappingForm/ContinuousMappingForm/ColorPalettePicker.spec.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "features/Vizmapper/PalettePicker/PaletteSelector.tsx",
+      "testFile": "features/Vizmapper/PalettePicker/PaletteSelector.spec.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "features/Vizmapper/StyleManager/StyleManager.tsx",
+      "testFile": "features/Vizmapper/StyleManager/StyleManager.spec.tsx, features/Vizmapper/StyleManager/StyleManagerUndo.spec.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "features/Vizmapper/StyleManager/StylePickerDialog.tsx",
+      "testFile": "features/Vizmapper/StyleManager/StylePickerDialog.spec.tsx",
+      "results": [
+        {
+          "behavior": {
+            "id": "StylePickerDialog:visible:open:false",
+            "componentName": "StylePickerDialog",
+            "provider": "material-ui",
+            "kind": "mui-dialog-visibility-render-state",
+            "title": "open=false renders visible=false",
+            "condition": {
+              "prop": "open",
+              "value": false
+            },
+            "event": {
+              "eventName": "render"
+            },
+            "expectation": {
+              "type": "element-visibility-state",
+              "visible": false
+            },
+            "evidence": {
+              "fileName": "/home/runner/work/ui-behavior-coverage/ui-behavior-coverage/target/src/features/Vizmapper/StyleManager/StylePickerDialog.tsx",
+              "line": 311,
+              "snippet": "<Dialog\n      open={open}\n      onClose={onClose}\n      fullWidth\n      maxWidth=\"md\"\n      data-testid=\"style-picker-dialog\"\n    >"
+            },
+            "target": {
+              "roles": [
+                "dialog"
+              ],
+              "testId": "style-picker-dialog",
+              "candidateCount": 1,
+              "sourceTag": "Dialog"
+            }
+          },
+          "status": "discovered",
+          "reason": "No test reaches StylePickerDialog with open=false in a control-flow-safe, resolvable form."
+        },
+        {
+          "behavior": {
+            "id": "StylePickerDialog:visible:open:true",
+            "componentName": "StylePickerDialog",
+            "provider": "material-ui",
+            "kind": "mui-dialog-visibility-render-state",
+            "title": "open=true renders visible=true",
+            "condition": {
+              "prop": "open",
+              "value": true
+            },
+            "event": {
+              "eventName": "render"
+            },
+            "expectation": {
+              "type": "element-visibility-state",
+              "visible": true
+            },
+            "evidence": {
+              "fileName": "/home/runner/work/ui-behavior-coverage/ui-behavior-coverage/target/src/features/Vizmapper/StyleManager/StylePickerDialog.tsx",
+              "line": 311,
+              "snippet": "<Dialog\n      open={open}\n      onClose={onClose}\n      fullWidth\n      maxWidth=\"md\"\n      data-testid=\"style-picker-dialog\"\n    >"
+            },
+            "target": {
+              "roles": [
+                "dialog"
+              ],
+              "testId": "style-picker-dialog",
+              "candidateCount": 1,
+              "sourceTag": "Dialog"
+            }
+          },
+          "status": "exercised",
+          "testName": "lists this network styles and marks the active one",
+          "reason": "The test reaches open=true, but never explicitly verifies visible=true on the correlated contract element.",
+          "suggestedAssertion": "expect(<element>).toBeVisible();"
+        }
+      ],
+      "scores": {
+        "discovered": 2,
+        "exercised": 1,
+        "verified": 0,
+        "behaviorReach": 50,
+        "behaviorVerification": 0,
+        "verificationGap": 50
+      }
+    },
+    {
+      "componentFile": "features/Vizmapper/VisualPropertyRender/Color.tsx",
+      "testFile": "features/Vizmapper/VisualPropertyRender/Color.spec.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    },
+    {
+      "componentFile": "features/Vizmapper/VisualPropertyRender/CustomGraphics/CustomGraphicDialog.tsx",
+      "testFile": "features/Vizmapper/VisualPropertyRender/CustomGraphics/CustomGraphicDialog.spec.tsx",
+      "results": [
+        {
+          "behavior": {
+            "id": "CustomGraphicDialog:visible:open:false",
+            "componentName": "CustomGraphicDialog",
+            "provider": "material-ui",
+            "kind": "mui-dialog-visibility-render-state",
+            "title": "open=false renders visible=false",
+            "condition": {
+              "prop": "open",
+              "value": false
+            },
+            "event": {
+              "eventName": "render"
+            },
+            "expectation": {
+              "type": "element-visibility-state",
+              "visible": false
+            },
+            "evidence": {
+              "fileName": "/home/runner/work/ui-behavior-coverage/ui-behavior-coverage/target/src/features/Vizmapper/VisualPropertyRender/CustomGraphics/CustomGraphicDialog.tsx",
+              "line": 263,
+              "snippet": "<Dialog\n      open={open}\n      onClose={onCancel}\n      maxWidth=\"lg\"\n      fullWidth\n      disableEscapeKeyDown={false}\n    >"
+            },
+            "target": {
+              "roles": [
+                "dialog"
+              ],
+              "candidateCount": 1,
+              "sourceTag": "Dialog"
+            }
+          },
+          "status": "discovered",
+          "reason": "No test reaches CustomGraphicDialog with open=false in a control-flow-safe, resolvable form."
+        },
+        {
+          "behavior": {
+            "id": "CustomGraphicDialog:visible:open:true",
+            "componentName": "CustomGraphicDialog",
+            "provider": "material-ui",
+            "kind": "mui-dialog-visibility-render-state",
+            "title": "open=true renders visible=true",
+            "condition": {
+              "prop": "open",
+              "value": true
+            },
+            "event": {
+              "eventName": "render"
+            },
+            "expectation": {
+              "type": "element-visibility-state",
+              "visible": true
+            },
+            "evidence": {
+              "fileName": "/home/runner/work/ui-behavior-coverage/ui-behavior-coverage/target/src/features/Vizmapper/VisualPropertyRender/CustomGraphics/CustomGraphicDialog.tsx",
+              "line": 263,
+              "snippet": "<Dialog\n      open={open}\n      onClose={onCancel}\n      maxWidth=\"lg\"\n      fullWidth\n      disableEscapeKeyDown={false}\n    >"
+            },
+            "target": {
+              "roles": [
+                "dialog"
+              ],
+              "candidateCount": 1,
+              "sourceTag": "Dialog"
+            }
+          },
+          "status": "exercised",
+          "testName": "offers pie and donut but not image when authoring a new value",
+          "reason": "The test reaches open=true, but never explicitly verifies visible=true on the correlated contract element.",
+          "suggestedAssertion": "expect(<element>).toBeVisible();"
+        }
+      ],
+      "scores": {
+        "discovered": 2,
+        "exercised": 1,
+        "verified": 0,
+        "behaviorReach": 50,
+        "behaviorVerification": 0,
+        "verificationGap": 50
+      }
+    },
+    {
+      "componentFile": "features/Vizmapper/VisualPropertyRender/CustomGraphics/Forms/PaletteForm.tsx",
+      "testFile": "features/Vizmapper/VisualPropertyRender/CustomGraphics/Forms/PaletteForm.spec.tsx",
+      "results": [],
+      "scores": {
+        "discovered": 0,
+        "exercised": 0,
+        "verified": 0,
+        "behaviorReach": 0,
+        "behaviorVerification": 0,
+        "verificationGap": 0
+      }
+    }
+  ],
+  "scores": {
+    "discovered": 12,
+    "exercised": 8,
+    "verified": 1,
+    "behaviorReach": 66.7,
+    "behaviorVerification": 8.3,
+    "verificationGap": 58.4
+  },
+  "discovery": {
+    "totalTestFiles": 300,
+    "testFilesWithRuntimeJsx": 30,
+    "testFilesWithTargets": 30,
+    "importsExamined": 32,
+    "importsResolved": 30,
+    "skipped": {
+      "no-runtime-jsx": 270,
+      "no-rendered-component-import": 0,
+      "external-module": 2,
+      "unresolved-module": 0,
+      "unresolved-barrel-export": 0
+    }
+  },
+  "schemaVersion": "1",
+  "toolVersion": "0.1.0-rc.1",
+  "reportType": "project",
+  "summary": {
+    "discovered": 12,
+    "exercised": 8,
+    "verified": 1,
+    "behaviorReach": 66.7,
+    "behaviorVerification": 8.3,
+    "verificationGap": 58.4
+  },
+  "report": {
+    "rootDir": "/home/runner/work/ui-behavior-coverage/ui-behavior-coverage/target/src",
+    "componentsAnalyzed": 29,
+    "testFilesAnalyzed": 30,
+    "reports": [
+      {
+        "componentFile": "boot/shell/BootShell.tsx",
+        "testFile": "boot/shell/bootShell.test.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "components/ValueTypeNameChip.tsx",
+        "testFile": "components/ValueTypeNameChip.spec.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "features/AppManager/AppInstallConfirmationDialog.tsx",
+        "testFile": "features/AppManager/AppInstallConfirmationDialog.spec.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "features/CytoscapeDesktopPermissionDialog.tsx",
+        "testFile": "features/CytoscapeDesktopPermissionDialog.spec.tsx",
+        "results": [
+          {
+            "behavior": {
+              "id": "CytoscapeDesktopPermissionDialog:visible:open:false",
+              "componentName": "CytoscapeDesktopPermissionDialog",
+              "provider": "material-ui",
+              "kind": "mui-dialog-visibility-render-state",
+              "title": "open=false renders visible=false",
+              "condition": {
+                "prop": "open",
+                "value": false
+              },
+              "event": {
+                "eventName": "render"
+              },
+              "expectation": {
+                "type": "element-visibility-state",
+                "visible": false
+              },
+              "evidence": {
+                "fileName": "/home/runner/work/ui-behavior-coverage/ui-behavior-coverage/target/src/features/CytoscapeDesktopPermissionDialog.tsx",
+                "line": 29,
+                "snippet": "<Dialog\n      open={open}\n      onClose={onCancel}\n      data-testid=\"cytoscape-desktop-permission-dialog\"\n    >"
+              },
+              "target": {
+                "roles": [
+                  "dialog"
+                ],
+                "testId": "cytoscape-desktop-permission-dialog",
+                "candidateCount": 1,
+                "sourceTag": "Dialog"
+              }
+            },
+            "status": "discovered",
+            "reason": "No test reaches CytoscapeDesktopPermissionDialog with open=false in a control-flow-safe, resolvable form."
+          },
+          {
+            "behavior": {
+              "id": "CytoscapeDesktopPermissionDialog:visible:open:true",
+              "componentName": "CytoscapeDesktopPermissionDialog",
+              "provider": "material-ui",
+              "kind": "mui-dialog-visibility-render-state",
+              "title": "open=true renders visible=true",
+              "condition": {
+                "prop": "open",
+                "value": true
+              },
+              "event": {
+                "eventName": "render"
+              },
+              "expectation": {
+                "type": "element-visibility-state",
+                "visible": true
+              },
+              "evidence": {
+                "fileName": "/home/runner/work/ui-behavior-coverage/ui-behavior-coverage/target/src/features/CytoscapeDesktopPermissionDialog.tsx",
+                "line": 29,
+                "snippet": "<Dialog\n      open={open}\n      onClose={onCancel}\n      data-testid=\"cytoscape-desktop-permission-dialog\"\n    >"
+              },
+              "target": {
+                "roles": [
+                  "dialog"
+                ],
+                "testId": "cytoscape-desktop-permission-dialog",
+                "candidateCount": 1,
+                "sourceTag": "Dialog"
+              }
+            },
+            "status": "exercised",
+            "testName": "explains the localhost permission prompt when open",
+            "reason": "The test reaches open=true, but never explicitly verifies visible=true on the correlated contract element.",
+            "suggestedAssertion": "expect(<element>).toBeVisible();"
+          }
+        ],
+        "scores": {
+          "discovered": 2,
+          "exercised": 1,
+          "verified": 0,
+          "behaviorReach": 50,
+          "behaviorVerification": 0,
+          "verificationGap": 50
+        }
+      },
+      {
+        "componentFile": "features/HierarchyViewer/components/FilterPanel/FilterPanel.tsx",
+        "testFile": "features/HierarchyViewer/components/FilterPanel/FilterPanel.spec.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "features/HierarchyViewer/components/MainPanel.tsx",
+        "testFile": "features/HierarchyViewer/components/MainPanel.spec.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "features/LayoutTools/FloatingLayoutToolsPanel.tsx",
+        "testFile": "features/LayoutTools/FloatingLayoutToolsPanel.spec.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "features/LLMQuery/components/HcxDisabledTooltip.tsx",
+        "testFile": "features/LLMQuery/components/HcxDisabledTooltip.spec.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "features/Messages/SnackbarMessageList.tsx",
+        "testFile": "features/Messages/SnackbarMessageList.test.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "features/NetworkPanel/NetworkPanel.tsx",
+        "testFile": "features/NetworkPanel/NetworkPanel.spec.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "features/NetworkPanel/NetworkTab.tsx",
+        "testFile": "features/NetworkPanel/NetworkTab.test.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "features/Onboarding/OnboardingHost.tsx",
+        "testFile": "features/Onboarding/OnboardingHost.spec.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "features/SyncTabs.tsx",
+        "testFile": "features/SyncTabs.spec.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "features/TableBrowser/components/TableHeaderTooltip.tsx",
+        "testFile": "features/TableBrowser/components/TableHeaderTooltip.spec.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "features/TableBrowser/ListPastePanel.tsx",
+        "testFile": "features/TableBrowser/ListPastePanel.spec.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "features/TableBrowser/ListValueEditorDialog.tsx",
+        "testFile": "features/TableBrowser/ListValueEditorDialog.spec.tsx",
+        "results": [
+          {
+            "behavior": {
+              "id": "ListValueEditorDialog:visible:open:false",
+              "componentName": "ListValueEditorDialog",
+              "provider": "material-ui",
+              "kind": "mui-dialog-visibility-render-state",
+              "title": "open=false renders visible=false",
+              "condition": {
+                "prop": "open",
+                "value": false
+              },
+              "event": {
+                "eventName": "render"
+              },
+              "expectation": {
+                "type": "element-visibility-state",
+                "visible": false
+              },
+              "evidence": {
+                "fileName": "/home/runner/work/ui-behavior-coverage/ui-behavior-coverage/target/src/features/TableBrowser/ListValueEditorDialog.tsx",
+                "line": 129,
+                "snippet": "<Dialog\n      open={open}\n      onClose={onCancel}\n      maxWidth=\"sm\"\n      fullWidth\n      data-testid=\"list-value-editor-dialog\"\n    >"
+              },
+              "target": {
+                "roles": [
+                  "dialog"
+                ],
+                "testId": "list-value-editor-dialog",
+                "candidateCount": 1,
+                "sourceTag": "Dialog"
+              }
+            },
+            "status": "discovered",
+            "reason": "No test reaches ListValueEditorDialog with open=false in a control-flow-safe, resolvable form."
+          },
+          {
+            "behavior": {
+              "id": "ListValueEditorDialog:visible:open:true",
+              "componentName": "ListValueEditorDialog",
+              "provider": "material-ui",
+              "kind": "mui-dialog-visibility-render-state",
+              "title": "open=true renders visible=true",
+              "condition": {
+                "prop": "open",
+                "value": true
+              },
+              "event": {
+                "eventName": "render"
+              },
+              "expectation": {
+                "type": "element-visibility-state",
+                "visible": true
+              },
+              "evidence": {
+                "fileName": "/home/runner/work/ui-behavior-coverage/ui-behavior-coverage/target/src/features/TableBrowser/ListValueEditorDialog.tsx",
+                "line": 129,
+                "snippet": "<Dialog\n      open={open}\n      onClose={onCancel}\n      maxWidth=\"sm\"\n      fullWidth\n      data-testid=\"list-value-editor-dialog\"\n    >"
+              },
+              "target": {
+                "roles": [
+                  "dialog"
+                ],
+                "testId": "list-value-editor-dialog",
+                "candidateCount": 1,
+                "sourceTag": "Dialog"
+              }
+            },
+            "status": "exercised",
+            "testName": "renders one input row per existing list element",
+            "reason": "The test reaches open=true, but never explicitly verifies visible=true on the correlated contract element.",
+            "suggestedAssertion": "expect(<element>).toBeVisible();"
+          }
+        ],
+        "scores": {
+          "discovered": 2,
+          "exercised": 1,
+          "verified": 0,
+          "behaviorReach": 50,
+          "behaviorVerification": 0,
+          "verificationGap": 50
+        }
+      },
+      {
+        "componentFile": "features/TableBrowser/TableColumnForm.tsx",
+        "testFile": "features/TableBrowser/TableColumnForm.spec.tsx",
+        "results": [
+          {
+            "behavior": {
+              "id": "CreateTableColumnForm:visible:open:false",
+              "componentName": "CreateTableColumnForm",
+              "provider": "material-ui",
+              "kind": "mui-dialog-visibility-render-state",
+              "title": "open=false renders visible=false",
+              "condition": {
+                "prop": "open",
+                "value": false
+              },
+              "event": {
+                "eventName": "render"
+              },
+              "expectation": {
+                "type": "element-visibility-state",
+                "visible": false
+              },
+              "evidence": {
+                "fileName": "/home/runner/work/ui-behavior-coverage/ui-behavior-coverage/target/src/features/TableBrowser/TableColumnForm.tsx",
+                "line": 303,
+                "snippet": "<Dialog\n      data-testid=\"create-table-column-dialog\"\n      maxWidth=\"sm\"\n      fullWidth={true}\n      open={props.open}\n      onClose={props.onClose}\n    >"
+              },
+              "target": {
+                "roles": [
+                  "dialog"
+                ],
+                "testId": "create-table-column-dialog",
+                "candidateCount": 1,
+                "sourceTag": "Dialog"
+              }
+            },
+            "status": "exercised",
+            "testName": "resets its state when reopened instead of when submitted",
+            "reason": "The test reaches open=false, but never explicitly verifies visible=false on the correlated contract element.",
+            "suggestedAssertion": "expect(<element>).not.toBeVisible();"
+          },
+          {
+            "behavior": {
+              "id": "CreateTableColumnForm:visible:open:true",
+              "componentName": "CreateTableColumnForm",
+              "provider": "material-ui",
+              "kind": "mui-dialog-visibility-render-state",
+              "title": "open=true renders visible=true",
+              "condition": {
+                "prop": "open",
+                "value": true
+              },
+              "event": {
+                "eventName": "render"
+              },
+              "expectation": {
+                "type": "element-visibility-state",
+                "visible": true
+              },
+              "evidence": {
+                "fileName": "/home/runner/work/ui-behavior-coverage/ui-behavior-coverage/target/src/features/TableBrowser/TableColumnForm.tsx",
+                "line": 303,
+                "snippet": "<Dialog\n      data-testid=\"create-table-column-dialog\"\n      maxWidth=\"sm\"\n      fullWidth={true}\n      open={props.open}\n      onClose={props.onClose}\n    >"
+              },
+              "target": {
+                "roles": [
+                  "dialog"
+                ],
+                "testId": "create-table-column-dialog",
+                "candidateCount": 1,
+                "sourceTag": "Dialog"
+              }
+            },
+            "status": "exercised",
+            "testName": "resets its state when reopened instead of when submitted",
+            "reason": "The test reaches open=true, but never explicitly verifies visible=true on the correlated contract element.",
+            "suggestedAssertion": "expect(<element>).toBeVisible();"
+          }
+        ],
+        "scores": {
+          "discovered": 2,
+          "exercised": 2,
+          "verified": 0,
+          "behaviorReach": 100,
+          "behaviorVerification": 0,
+          "verificationGap": 100
+        }
+      },
+      {
+        "componentFile": "features/ToolBar/DebugIndicator.tsx",
+        "testFile": "features/ToolBar/DebugIndicator.spec.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "features/ToolBar/DropdownMenu.tsx",
+        "testFile": "features/ToolBar/DropdownMenu.spec.tsx",
+        "results": [
+          {
+            "behavior": {
+              "id": "DropdownMenu:mui:disabled:true:onOpenChange:mui-button-disabled-event-suppression",
+              "componentName": "DropdownMenu",
+              "provider": "material-ui",
+              "kind": "mui-button-disabled-event-suppression",
+              "title": "disabled=true prevents onOpenChange activation",
+              "condition": {
+                "prop": "disabled",
+                "value": true
+              },
+              "event": {
+                "handlerProp": "onOpenChange",
+                "eventName": "click"
+              },
+              "expectation": {
+                "type": "callback-not-called",
+                "callbackProp": "onOpenChange"
+              },
+              "evidence": {
+                "fileName": "features/ToolBar/DropdownMenu.tsx",
+                "line": 195,
+                "snippet": "<Button\n            data-testid={`toolbar-${id}-menu-button`}\n            disabled={disabled}\n            sx={{\n              color: darkPalette.text.primary,\n              textTransform: 'none',\n              '&.Mui-disabled': {\n                color: darkPalette.text.disabled,\n              },\n            }}\n            id={`${id}-dropdown`}\n            aria-controls={open ? 'basic-menu' : undefined}\n            aria-haspopup=\"true\"\n            aria-expanded={open ? 'true' : undefined}\n            onClick={handleClick}\n          >"
+              },
+              "target": {
+                "roles": [
+                  "button",
+                  "link"
+                ],
+                "candidateCount": 1,
+                "sourceTag": "Button"
+              }
+            },
+            "status": "exercised",
+            "testName": "disables the menu button and does not open when disabled",
+            "callbackVariable": "onOpenChange",
+            "reason": "The test reaches the behavior condition and performs click, but the interaction target cannot be positively correlated with the contract element; verification is withheld."
+          },
+          {
+            "behavior": {
+              "id": "DropdownMenu:mui-render:mui-button-disabled-render-state:disabled:true:disabled:true",
+              "componentName": "DropdownMenu",
+              "provider": "material-ui",
+              "kind": "mui-button-disabled-render-state",
+              "title": "disabled=true renders disabled=true",
+              "condition": {
+                "prop": "disabled",
+                "value": true
+              },
+              "event": {
+                "eventName": "render"
+              },
+              "expectation": {
+                "type": "element-boolean-state",
+                "state": "disabled",
+                "value": true
+              },
+              "evidence": {
+                "fileName": "/home/runner/work/ui-behavior-coverage/ui-behavior-coverage/target/src/features/ToolBar/DropdownMenu.tsx",
+                "line": 195,
+                "snippet": "<Button\n            data-testid={`toolbar-${id}-menu-button`}\n            disabled={disabled}\n            sx={{\n              color: darkPalette.text.primary,\n              textTransform: 'none',\n              '&.Mui-disabled': {\n                color: darkPalette.text.disabled,\n              },\n            }}\n            id={`${id}-dropdown`}\n            aria-controls={open ? 'basic-menu' : undefined}\n            aria-haspopup=\"true\"\n            aria-expanded={open ? 'true' : undefined}\n            onClick={handleClick}\n          >"
+              },
+              "target": {
+                "roles": [
+                  "button",
+                  "link"
+                ],
+                "candidateCount": 1,
+                "sourceTag": "Button"
+              }
+            },
+            "status": "verified",
+            "testName": "disables the menu button and does not open when disabled",
+            "reason": "The test reaches disabled=true and explicitly verifies disabled=true on the correlated contract element."
+          }
+        ],
+        "scores": {
+          "discovered": 2,
+          "exercised": 2,
+          "verified": 1,
+          "behaviorReach": 100,
+          "behaviorVerification": 50,
+          "verificationGap": 50
+        }
+      },
+      {
+        "componentFile": "features/ToolBar/EditMenu/CreateNodeMenuItem.tsx",
+        "testFile": "features/ToolBar/EditMenu/CreateNodeMenuItem.spec.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "features/ToolBar/HelpMenu/AboutCytoscapeWebMenuItem.tsx",
+        "testFile": "features/ToolBar/HelpMenu/AboutCytoscapeWebMenuItem.spec.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "features/ToolBar/Search/SearchBox.tsx",
+        "testFile": "features/ToolBar/Search/SearchBox.test.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "features/Vizmapper/Forms/MappingForm/ContinuousMappingForm/ColorPalettePicker.tsx",
+        "testFile": "features/Vizmapper/Forms/MappingForm/ContinuousMappingForm/ColorPalettePicker.spec.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "features/Vizmapper/PalettePicker/PaletteSelector.tsx",
+        "testFile": "features/Vizmapper/PalettePicker/PaletteSelector.spec.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "features/Vizmapper/StyleManager/StyleManager.tsx",
+        "testFile": "features/Vizmapper/StyleManager/StyleManager.spec.tsx, features/Vizmapper/StyleManager/StyleManagerUndo.spec.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "features/Vizmapper/StyleManager/StylePickerDialog.tsx",
+        "testFile": "features/Vizmapper/StyleManager/StylePickerDialog.spec.tsx",
+        "results": [
+          {
+            "behavior": {
+              "id": "StylePickerDialog:visible:open:false",
+              "componentName": "StylePickerDialog",
+              "provider": "material-ui",
+              "kind": "mui-dialog-visibility-render-state",
+              "title": "open=false renders visible=false",
+              "condition": {
+                "prop": "open",
+                "value": false
+              },
+              "event": {
+                "eventName": "render"
+              },
+              "expectation": {
+                "type": "element-visibility-state",
+                "visible": false
+              },
+              "evidence": {
+                "fileName": "/home/runner/work/ui-behavior-coverage/ui-behavior-coverage/target/src/features/Vizmapper/StyleManager/StylePickerDialog.tsx",
+                "line": 311,
+                "snippet": "<Dialog\n      open={open}\n      onClose={onClose}\n      fullWidth\n      maxWidth=\"md\"\n      data-testid=\"style-picker-dialog\"\n    >"
+              },
+              "target": {
+                "roles": [
+                  "dialog"
+                ],
+                "testId": "style-picker-dialog",
+                "candidateCount": 1,
+                "sourceTag": "Dialog"
+              }
+            },
+            "status": "discovered",
+            "reason": "No test reaches StylePickerDialog with open=false in a control-flow-safe, resolvable form."
+          },
+          {
+            "behavior": {
+              "id": "StylePickerDialog:visible:open:true",
+              "componentName": "StylePickerDialog",
+              "provider": "material-ui",
+              "kind": "mui-dialog-visibility-render-state",
+              "title": "open=true renders visible=true",
+              "condition": {
+                "prop": "open",
+                "value": true
+              },
+              "event": {
+                "eventName": "render"
+              },
+              "expectation": {
+                "type": "element-visibility-state",
+                "visible": true
+              },
+              "evidence": {
+                "fileName": "/home/runner/work/ui-behavior-coverage/ui-behavior-coverage/target/src/features/Vizmapper/StyleManager/StylePickerDialog.tsx",
+                "line": 311,
+                "snippet": "<Dialog\n      open={open}\n      onClose={onClose}\n      fullWidth\n      maxWidth=\"md\"\n      data-testid=\"style-picker-dialog\"\n    >"
+              },
+              "target": {
+                "roles": [
+                  "dialog"
+                ],
+                "testId": "style-picker-dialog",
+                "candidateCount": 1,
+                "sourceTag": "Dialog"
+              }
+            },
+            "status": "exercised",
+            "testName": "lists this network styles and marks the active one",
+            "reason": "The test reaches open=true, but never explicitly verifies visible=true on the correlated contract element.",
+            "suggestedAssertion": "expect(<element>).toBeVisible();"
+          }
+        ],
+        "scores": {
+          "discovered": 2,
+          "exercised": 1,
+          "verified": 0,
+          "behaviorReach": 50,
+          "behaviorVerification": 0,
+          "verificationGap": 50
+        }
+      },
+      {
+        "componentFile": "features/Vizmapper/VisualPropertyRender/Color.tsx",
+        "testFile": "features/Vizmapper/VisualPropertyRender/Color.spec.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      },
+      {
+        "componentFile": "features/Vizmapper/VisualPropertyRender/CustomGraphics/CustomGraphicDialog.tsx",
+        "testFile": "features/Vizmapper/VisualPropertyRender/CustomGraphics/CustomGraphicDialog.spec.tsx",
+        "results": [
+          {
+            "behavior": {
+              "id": "CustomGraphicDialog:visible:open:false",
+              "componentName": "CustomGraphicDialog",
+              "provider": "material-ui",
+              "kind": "mui-dialog-visibility-render-state",
+              "title": "open=false renders visible=false",
+              "condition": {
+                "prop": "open",
+                "value": false
+              },
+              "event": {
+                "eventName": "render"
+              },
+              "expectation": {
+                "type": "element-visibility-state",
+                "visible": false
+              },
+              "evidence": {
+                "fileName": "/home/runner/work/ui-behavior-coverage/ui-behavior-coverage/target/src/features/Vizmapper/VisualPropertyRender/CustomGraphics/CustomGraphicDialog.tsx",
+                "line": 263,
+                "snippet": "<Dialog\n      open={open}\n      onClose={onCancel}\n      maxWidth=\"lg\"\n      fullWidth\n      disableEscapeKeyDown={false}\n    >"
+              },
+              "target": {
+                "roles": [
+                  "dialog"
+                ],
+                "candidateCount": 1,
+                "sourceTag": "Dialog"
+              }
+            },
+            "status": "discovered",
+            "reason": "No test reaches CustomGraphicDialog with open=false in a control-flow-safe, resolvable form."
+          },
+          {
+            "behavior": {
+              "id": "CustomGraphicDialog:visible:open:true",
+              "componentName": "CustomGraphicDialog",
+              "provider": "material-ui",
+              "kind": "mui-dialog-visibility-render-state",
+              "title": "open=true renders visible=true",
+              "condition": {
+                "prop": "open",
+                "value": true
+              },
+              "event": {
+                "eventName": "render"
+              },
+              "expectation": {
+                "type": "element-visibility-state",
+                "visible": true
+              },
+              "evidence": {
+                "fileName": "/home/runner/work/ui-behavior-coverage/ui-behavior-coverage/target/src/features/Vizmapper/VisualPropertyRender/CustomGraphics/CustomGraphicDialog.tsx",
+                "line": 263,
+                "snippet": "<Dialog\n      open={open}\n      onClose={onCancel}\n      maxWidth=\"lg\"\n      fullWidth\n      disableEscapeKeyDown={false}\n    >"
+              },
+              "target": {
+                "roles": [
+                  "dialog"
+                ],
+                "candidateCount": 1,
+                "sourceTag": "Dialog"
+              }
+            },
+            "status": "exercised",
+            "testName": "offers pie and donut but not image when authoring a new value",
+            "reason": "The test reaches open=true, but never explicitly verifies visible=true on the correlated contract element.",
+            "suggestedAssertion": "expect(<element>).toBeVisible();"
+          }
+        ],
+        "scores": {
+          "discovered": 2,
+          "exercised": 1,
+          "verified": 0,
+          "behaviorReach": 50,
+          "behaviorVerification": 0,
+          "verificationGap": 50
+        }
+      },
+      {
+        "componentFile": "features/Vizmapper/VisualPropertyRender/CustomGraphics/Forms/PaletteForm.tsx",
+        "testFile": "features/Vizmapper/VisualPropertyRender/CustomGraphics/Forms/PaletteForm.spec.tsx",
+        "results": [],
+        "scores": {
+          "discovered": 0,
+          "exercised": 0,
+          "verified": 0,
+          "behaviorReach": 0,
+          "behaviorVerification": 0,
+          "verificationGap": 0
+        }
+      }
+    ],
+    "scores": {
+      "discovered": 12,
+      "exercised": 8,
+      "verified": 1,
+      "behaviorReach": 66.7,
+      "behaviorVerification": 8.3,
+      "verificationGap": 58.4
+    },
+    "discovery": {
+      "totalTestFiles": 300,
+      "testFilesWithRuntimeJsx": 30,
+      "testFilesWithTargets": 30,
+      "importsExamined": 32,
+      "importsResolved": 30,
+      "skipped": {
+        "no-runtime-jsx": 270,
+        "no-rendered-component-import": 0,
+        "external-module": 2,
+        "unresolved-module": 0,
+        "unresolved-barrel-export": 0
+      }
+    }
+  }
+}

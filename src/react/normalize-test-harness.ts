@@ -1,3 +1,5 @@
+import { expandTestRenderEvidence } from './expand-test-render-evidence';
+
 export const defaultRenderHelpers = [
   'renderWithProviders',
   'renderWithTheme',
@@ -15,9 +17,10 @@ function escapeRegExp(value: string): string {
 }
 
 /**
- * Normalizes known custom render helpers to Testing Library's `render` call shape.
- * The analyzer only relies on ordering within the reparsed source, so textual
- * normalization is intentionally simpler and safer than mutating the user's AST.
+ * Normalizes known custom render helpers to Testing Library's `render` call shape,
+ * then expands statically safe local render helpers and proven rerender bindings.
+ * The analyzer only relies on ordering within the reparsed source, so the
+ * normalized source is analysis-only and never written back to user code.
  */
 export function normalizeTestHarnessSource(
   source: string,
@@ -32,5 +35,5 @@ export function normalizeTestHarnessSource(
     normalized = normalized.replace(pattern, 'render(');
   }
 
-  return normalized;
+  return expandTestRenderEvidence(normalized);
 }
