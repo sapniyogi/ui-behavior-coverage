@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.0
+
+First stable release of ui-behavior-coverage.
+
+This release promotes the analyzer behavior validated in
+0.1.0-rc.2 without additional semantic expansion.
+
+Highlights:
+- behavioral verification coverage for React tests;
+- first-class Material UI semantic analysis;
+- project-level component/test discovery and composition tracing;
+- conservative target-aware interaction and assertion correlation;
+- safe local render-helper and Testing Library rerender analysis;
+- suppression of internal implementation-handler contracts;
+- versioned JSON schema v1;
+- external validation against pinned production React/MUI repositories.
+
 ## 0.1.0-rc.2
 
 Accuracy-focused release candidate incorporating corrections identified during pinned Phase B validation against `cytoscape/cytoscape-web`.

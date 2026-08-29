@@ -8,12 +8,12 @@ on:
       version:
         description: Exact package version, for example 0.1.0-rc.1
         required: true
-        default: 0.1.0-rc.1
+        default: 0.1.0
         type: string
       npm_tag:
         description: npm dist-tag used for publication
         required: true
-        default: rc
+        default: latest
         type: choice
         options:
           - rc
